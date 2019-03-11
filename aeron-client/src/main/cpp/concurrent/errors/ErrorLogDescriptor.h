@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef AERON_ERRORLOGDESCRIPTOR_H
-#define AERON_ERRORLOGDESCRIPTOR_H
+#ifndef AERON_CONCURRENT_ERROR_LOG_DESCRIPTOR_H
+#define AERON_CONCURRENT_ERROR_LOG_DESCRIPTOR_H
 
 #include <cstddef>
 #include <util/Index.h>
 #include <concurrent/AtomicBuffer.h>
 
-namespace aeron {
-
-namespace concurrent {
-
-namespace errors {
+namespace aeron { namespace concurrent { namespace errors {
 
 /**
  * Distinct record of error observations. Rather than grow a record indefinitely when many errors of the same type
@@ -73,8 +69,8 @@ struct ErrorLogEntryDefn
 
 static const util::index_t LENGTH_OFFSET = offsetof(ErrorLogEntryDefn, length);
 static const util::index_t OBSERVATION_COUNT_OFFSET = offsetof(ErrorLogEntryDefn, observationCount);
-static const util::index_t LAST_OBERSATION_TIMESTAMP_OFFSET = offsetof(ErrorLogEntryDefn, lastObservationTimestamp);
-static const util::index_t FIRST_OBERSATION_TIMESTAMP_OFFSET = offsetof(ErrorLogEntryDefn, firstObservationTimestamp);
+static const util::index_t LAST_OBSERVATION_TIMESTAMP_OFFSET = offsetof(ErrorLogEntryDefn, lastObservationTimestamp);
+static const util::index_t FIRST_OBSERVATION_TIMESTAMP_OFFSET = offsetof(ErrorLogEntryDefn, firstObservationTimestamp);
 static const util::index_t ENCODED_ERROR_OFFSET = sizeof(ErrorLogEntryDefn);
 static const util::index_t HEADER_LENGTH = sizeof(ErrorLogEntryDefn);
 

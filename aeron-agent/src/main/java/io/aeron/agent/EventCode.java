@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,9 @@ public enum EventCode
     CMD_IN_CLIENT_CLOSE(40, EventDissector::dissectAsCommand),
 
     CMD_IN_ADD_RCV_DESTINATION(41, EventDissector::dissectAsCommand),
-    CMD_IN_REMOVE_RCV_DESTINATION(42, EventDissector::dissectAsCommand);
+    CMD_IN_REMOVE_RCV_DESTINATION(42, EventDissector::dissectAsCommand),
+
+    CMD_OUT_ON_CLIENT_TIMEOUT(43, EventDissector::dissectAsCommand);
 
     private static final int MAX_ID = 63;
     private static final EventCode[] EVENT_CODE_BY_ID = new EventCode[MAX_ID];

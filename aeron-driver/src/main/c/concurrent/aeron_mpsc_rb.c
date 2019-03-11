@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ inline static int32_t aeron_mpsc_rb_claim_capacity(volatile aeron_mpsc_rb_t *rin
             AERON_PUT_ORDERED(ring_buffer->descriptor->head_cache_position, head);
         }
 
+        padding = 0;
         tail_index = (int32_t)tail & mask;
         to_buffer_end_length = ring_buffer->capacity - tail_index;
 
@@ -251,7 +252,7 @@ bool aeron_mpsc_rb_unblock(volatile aeron_mpsc_rb_t *ring_buffer)
     consumer_index = (int32_t)head & mask;
     producer_index = (int32_t)tail & mask;
 
-    if (producer_index == consumer_index)
+    if (head == tail)
     {
         return false;
     }

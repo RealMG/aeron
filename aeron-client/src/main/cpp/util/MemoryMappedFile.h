@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef INCLUDED_AERON_UTIL_MEMORY_MAPPED_FILE__
-#define INCLUDED_AERON_UTIL_MEMORY_MAPPED_FILE__
+#ifndef AERON_UTIL_MEMORY_MAPPED_FILE_H
+#define AERON_UTIL_MEMORY_MAPPED_FILE_H
 
 #include <cstdint>
 #include <memory>
@@ -54,7 +54,6 @@ public:
     MemoryMappedFile(MemoryMappedFile const&) = delete;
     MemoryMappedFile& operator=(MemoryMappedFile const&) = delete;
 
-    // some OS specific utility methods
     static size_t getPageSize();
     static std::int64_t getFileSize(const char *filename);
 

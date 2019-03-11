@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.aeron;
 
+import io.aeron.logbuffer.LogBufferDescriptor;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.junit.After;
@@ -53,6 +54,7 @@ public class FragmentedMessageTest
     private final FragmentHandler mockFragmentHandler = mock(FragmentHandler.class);
 
     private final MediaDriver driver = MediaDriver.launch(new MediaDriver.Context()
+        .publicationTermBufferLength(LogBufferDescriptor.TERM_MIN_LENGTH)
         .errorHandler(Throwable::printStackTrace)
         .threadingMode(ThreadingMode.SHARED));
 

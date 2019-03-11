@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,9 @@ final class ServiceProxy implements AutoCloseable
     private final MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
     private final JoinLogEncoder joinLogEncoder = new JoinLogEncoder();
     private final ClusterMembersResponseEncoder clusterMembersResponseEncoder = new ClusterMembersResponseEncoder();
+    private final ServiceTerminationPositionEncoder serviceTerminationPositionEncoder =
+        new ServiceTerminationPositionEncoder();
+    private final ElectionStartEventEncoder electionStartEventEncoder = new ElectionStartEventEncoder();
     private final Publication publication;
 
     ServiceProxy(final Publication publication)
@@ -112,6 +115,58 @@ final class ServiceProxy implements AutoCloseable
         while (--attempts > 0);
 
         throw new ClusterException("failed to send cluster members response");
+    }
+
+    void terminationPosition(final long logPosition)
+    {
+        final int length = MessageHeaderDecoder.ENCODED_LENGTH + ServiceTerminationPositionEncoder.BLOCK_LENGTH;
+
+        int attempts = SEND_ATTEMPTS * 2;
+        do
+        {
+            final long result = publication.tryClaim(length, bufferClaim);
+            if (result > 0)
+            {
+                serviceTerminationPositionEncoder
+                    .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
+                    .logPosition(logPosition);
+
+                bufferClaim.commit();
+
+                return;
+            }
+
+            checkResult(result);
+        }
+        while (--attempts > 0);
+
+        throw new ClusterException("failed to send service termination position");
+    }
+
+    void electionStartEvent(final long logPosition)
+    {
+        final int length = MessageHeaderDecoder.ENCODED_LENGTH + ElectionStartEventEncoder.BLOCK_LENGTH;
+
+        int attempts = SEND_ATTEMPTS * 2;
+        do
+        {
+            final long result = publication.tryClaim(length, bufferClaim);
+            if (result > 0)
+            {
+                electionStartEventEncoder
+                    .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
+                    .logPosition(logPosition);
+
+                bufferClaim.commit();
+
+                return;
+            }
+
+            checkResult(result);
+        }
+        while (--attempts > 0);
+
+        throw new ClusterException("failed to send election start event");
     }
 
     private static void checkResult(final long result)

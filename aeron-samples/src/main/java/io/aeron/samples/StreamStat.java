@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import static io.aeron.driver.status.StreamPositionCounter.*;
  * output per stream with each of the position counters for that stream.
  * <p>
  * Each counter has the format:
- * {@code <label-name>:<registration id>:<position value>}
+ * {@code <label-name>:<registration-id>:<position value>}
  */
 public class StreamStat
 {
@@ -241,9 +241,9 @@ public class StreamStat
         }
 
         /**
-         * The identifier for the counter when registered.
+         * The identifier for the registered entity, such as publication or subscription, to which the counter relates.
          *
-         * @return the identifier for the counter when registered.
+         * @return the identifier for the registered entity to which the counter relates.
          */
         public long id()
         {

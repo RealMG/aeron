@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -459,7 +459,7 @@ public class AuthenticationTest
             new ClusteredServiceContainer.Context()
                 .clusteredService(service)
                 .terminationHook(TestUtil.TERMINATION_HOOK)
-                .errorHandler(Throwable::printStackTrace));
+                .errorHandler(TestUtil.errorHandler(0)));
     }
 
     private AeronCluster connectToCluster(final CredentialsSupplier credentialsSupplier)
@@ -483,7 +483,7 @@ public class AuthenticationTest
             new MediaDriver.Context()
                 .warnIfDirectoryExists(true)
                 .threadingMode(ThreadingMode.SHARED)
-                .errorHandler(Throwable::printStackTrace)
+                .errorHandler(TestUtil.errorHandler(0))
                 .dirDeleteOnStart(true),
             new Archive.Context()
                 .maxCatalogEntries(MAX_CATALOG_ENTRIES)

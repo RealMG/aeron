@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#define _DISABLE_EXTENDED_ALIGNED_STORAGE
 #include "Aeron.h"
 
 namespace aeron {
@@ -39,7 +40,7 @@ Aeron::Aeron(Context &context) :
     m_randomEngine(m_randomDevice()),
     m_sessionIdDistribution(-INT_MAX, INT_MAX),
     m_context(context.conclude()),
-    m_cncBuffer(mapCncFile(context)),
+    m_cncBuffer(mapCncFile(m_context)),
     m_toDriverAtomicBuffer(CncFileDescriptor::createToDriverBuffer(m_cncBuffer)),
     m_toClientsAtomicBuffer(CncFileDescriptor::createToClientsBuffer(m_cncBuffer)),
     m_countersMetadataBuffer(CncFileDescriptor::createCounterMetadataBuffer(m_cncBuffer)),
@@ -54,14 +55,14 @@ Aeron::Aeron(Context &context) :
         m_toClientsCopyReceiver,
         m_countersMetadataBuffer,
         m_countersValueBuffer,
-        context.m_onNewPublicationHandler,
-        context.m_onNewExclusivePublicationHandler,
-        context.m_onNewSubscriptionHandler,
-        context.m_exceptionHandler,
-        context.m_onAvailableCounterHandler,
-        context.m_onUnavailableCounterHandler,
-        context.m_mediaDriverTimeout,
-        context.m_resourceLingerTimeout,
+        m_context.m_onNewPublicationHandler,
+        m_context.m_onNewExclusivePublicationHandler,
+        m_context.m_onNewSubscriptionHandler,
+        m_context.m_exceptionHandler,
+        m_context.m_onAvailableCounterHandler,
+        m_context.m_onUnavailableCounterHandler,
+        m_context.m_mediaDriverTimeout,
+        m_context.m_resourceLingerTimeout,
         CncFileDescriptor::clientLivenessTimeout(m_cncBuffer)),
     m_idleStrategy(IDLE_SLEEP_MS),
     m_conductorRunner(m_conductor, m_idleStrategy, m_context.m_exceptionHandler, AGENT_NAME),
@@ -102,8 +103,7 @@ inline MemoryMappedFile::ptr_t Aeron::mapCncFile(Context &context)
         {
             if (currentTimeMillis() > (startMs + context.m_mediaDriverTimeout))
             {
-                throw DriverTimeoutException(
-                    util::strPrintf("CnC file not created: %s", context.cncFileName().c_str()), SOURCEINFO);
+                throw DriverTimeoutException("CnC file not created: " + context.cncFileName(), SOURCEINFO);
             }
 
             std::this_thread::sleep_for(IDLE_SLEEP_MS_16);
@@ -118,8 +118,7 @@ inline MemoryMappedFile::ptr_t Aeron::mapCncFile(Context &context)
             if (currentTimeMillis() > (startMs + context.m_mediaDriverTimeout))
             {
                 throw DriverTimeoutException(
-                    util::strPrintf("CnC file is created but not initialised.: %s", context.cncFileName().c_str()),
-                    SOURCEINFO);
+                    "CnC file is created but not initialised: " + context.cncFileName(), SOURCEINFO);
             }
 
             std::this_thread::sleep_for(IDLE_SLEEP_MS_1);
@@ -128,7 +127,7 @@ inline MemoryMappedFile::ptr_t Aeron::mapCncFile(Context &context)
         if (CncFileDescriptor::CNC_VERSION != cncVersion)
         {
             throw util::IllegalStateException(
-                util::strPrintf("CnC file version not supported: version=%d", cncVersion), SOURCEINFO);
+                "CnC file version not supported: " + std::to_string(cncVersion), SOURCEINFO);
         }
 
         AtomicBuffer toDriverBuffer(CncFileDescriptor::createToDriverBuffer(cncBuffer));
@@ -138,7 +137,7 @@ inline MemoryMappedFile::ptr_t Aeron::mapCncFile(Context &context)
         {
             if (currentTimeMillis() > (startMs + context.m_mediaDriverTimeout))
             {
-                throw DriverTimeoutException(std::string("No driver heartbeat detected."), SOURCEINFO);
+                throw DriverTimeoutException(std::string("no driver heartbeat detected"), SOURCEINFO);
             }
 
             std::this_thread::sleep_for(IDLE_SLEEP_MS_1);
@@ -149,7 +148,7 @@ inline MemoryMappedFile::ptr_t Aeron::mapCncFile(Context &context)
         {
             if (timeMs > (startMs + context.m_mediaDriverTimeout))
             {
-                throw DriverTimeoutException(std::string("No driver heartbeat detected."), SOURCEINFO);
+                throw DriverTimeoutException(std::string("no driver heartbeat detected"), SOURCEINFO);
             }
 
             cncBuffer = nullptr;

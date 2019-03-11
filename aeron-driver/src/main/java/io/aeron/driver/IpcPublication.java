@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ public final class IpcPublication implements DriverManagedResource, Subscribable
         final Position publisherPos,
         final Position publisherLimit,
         final RawLog rawLog,
+        final int termWindowLength,
         final long unblockTimeoutNs,
         final long lingerTimeoutNs,
         final long nowNs,
@@ -94,7 +95,7 @@ public final class IpcPublication implements DriverManagedResource, Subscribable
         final int termLength = rawLog.termLength();
         this.termBufferLength = termLength;
         this.positionBitsToShift = LogBufferDescriptor.positionBitsToShift(termLength);
-        this.termWindowLength = Configuration.ipcPublicationTermWindowLength(termLength);
+        this.termWindowLength = termWindowLength;
         this.tripGain = termWindowLength / 8;
         this.publisherPos = publisherPos;
         this.publisherLimit = publisherLimit;
@@ -248,7 +249,13 @@ public final class IpcPublication implements DriverManagedResource, Subscribable
         if (0 == --refCount)
         {
             state = State.INACTIVE;
-            LogBufferDescriptor.endOfStreamPosition(metaDataBuffer, producerPosition());
+            final long producerPosition = producerPosition();
+            if (publisherLimit.get() > producerPosition)
+            {
+                publisherLimit.setOrdered(producerPosition);
+            }
+
+            LogBufferDescriptor.endOfStreamPosition(metaDataBuffer, producerPosition);
         }
     }
 

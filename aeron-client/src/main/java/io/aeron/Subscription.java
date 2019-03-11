@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,28 +154,6 @@ public class Subscription extends SubscriptionFields implements AutoCloseable
     }
 
     /**
-     * Poll the {@link Image}s under the subscription for having reached End of Stream.
-     *
-     * @param endOfStreamHandler callback for handling end of stream indication.
-     * @return number of {@link Image} that have reached End of Stream.
-     */
-    public int pollEndOfStreams(final EndOfStreamHandler endOfStreamHandler)
-    {
-        int numEndOfStreams = 0;
-
-        for (final Image image : images)
-        {
-            if (image.isEndOfStream())
-            {
-                numEndOfStreams++;
-                endOfStreamHandler.onEndOfStream(image);
-            }
-        }
-
-        return numEndOfStreams;
-    }
-
-    /**
      * Poll the {@link Image}s under the subscription for available message fragments.
      * <p>
      * Each fragment read will be a whole message if it is under MTU length. If larger than MTU then it will come
@@ -184,7 +162,7 @@ public class Subscription extends SubscriptionFields implements AutoCloseable
      * To assemble messages that span multiple fragments then use {@link FragmentAssembler}.
      *
      * @param fragmentHandler callback for handling each message fragment as it is read.
-     * @param fragmentLimit   number of message fragments to limit for the poll operation across multiple {@link Image}s.
+     * @param fragmentLimit   number of message fragments to limit when polling across multiple {@link Image}s.
      * @return the number of fragments received
      */
     public int poll(final FragmentHandler fragmentHandler, final int fragmentLimit)
@@ -223,7 +201,7 @@ public class Subscription extends SubscriptionFields implements AutoCloseable
      * To assemble messages that span multiple fragments then use {@link ControlledFragmentAssembler}.
      *
      * @param fragmentHandler callback for handling each message fragment as it is read.
-     * @param fragmentLimit   number of message fragments to limit for the poll operation across multiple {@link Image}s.
+     * @param fragmentLimit   number of message fragments to limit when polling across multiple {@link Image}s.
      * @return the number of fragments received
      * @see ControlledFragmentHandler
      */
@@ -502,7 +480,7 @@ public class Subscription extends SubscriptionFields implements AutoCloseable
         if (null != removedImage)
         {
             images = ArrayUtil.remove(oldArray, i);
-            conductor.releaseLogBuffers(removedImage.logBuffers(), removedImage.correlationId());
+            conductor.releaseLogBuffers(removedImage.logBuffers(), correlationId);
         }
 
         return removedImage;
@@ -534,5 +512,15 @@ public class Subscription extends SubscriptionFields implements AutoCloseable
                 conductor.handleError(ex);
             }
         }
+    }
+
+    public String toString()
+    {
+        return "Subscription{" +
+            "registrationId=" + registrationId +
+            ", streamId=" + streamId +
+            ", channel='" + channel + '\'' +
+            ", imageCount=" + imageCount() +
+            '}';
     }
 }

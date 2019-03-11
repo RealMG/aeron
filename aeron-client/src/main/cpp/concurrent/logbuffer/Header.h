@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_HEADER__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_HEADER__
+#ifndef AERON_CONCURRENT_LOGBUFFER_HEADER_H
+#define AERON_CONCURRENT_LOGBUFFER_HEADER_H
 
 #include <util/Index.h>
 #include <util/BitUtil.h>
@@ -34,19 +34,6 @@ public:
         m_context(context), m_offset(0), m_initialTermId(initialTermId)
     {
         m_positionBitsToShift = util::BitUtil::numberOfTrailingZeroes(capacity);
-    }
-
-    Header(const Header& header) = default;
-
-    Header& operator=(Header& header)
-    {
-        m_context = header.m_context;
-        m_buffer.wrap(header.m_buffer);
-        m_offset = header.m_offset;
-        m_initialTermId = header.m_initialTermId;
-        m_positionBitsToShift = header.m_positionBitsToShift;
-
-        return *this;
     }
 
     /**

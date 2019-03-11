@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ public final class ClusteredServiceContainer implements AutoCloseable
                 ctx.markFile.signalFailedStart();
             }
 
+            ctx.close();
             throw ex;
         }
 
@@ -129,7 +130,6 @@ public final class ClusteredServiceContainer implements AutoCloseable
     public void close()
     {
         CloseHelper.close(serviceAgentRunner);
-        CloseHelper.close(ctx);
     }
 
     /**
@@ -418,7 +418,11 @@ public final class ClusteredServiceContainer implements AutoCloseable
         }
     }
 
-    public static class Context implements AutoCloseable, Cloneable
+    /**
+     * The context will be owned by {@link ClusteredServiceAgent} after a successful
+     * {@link ClusteredServiceContainer#launch(Context)} and closed via {@link ClusteredServiceContainer#close()}.
+     */
+    public static class Context implements Cloneable
     {
         private int serviceId = Configuration.serviceId();
         private String serviceName = Configuration.serviceName();
@@ -506,10 +510,7 @@ public final class ClusteredServiceContainer implements AutoCloseable
             {
                 markFile = new ClusterMarkFile(
                     new File(clusterDir, ClusterMarkFile.markFilenameForService(serviceId)),
-                    ClusterComponentType.CONTAINER,
-                    errorBufferLength,
-                    epochClock,
-                    0);
+                    ClusterComponentType.CONTAINER, errorBufferLength, epochClock, 0);
             }
 
             if (null == errorLog)
@@ -576,8 +577,7 @@ public final class ClusteredServiceContainer implements AutoCloseable
                 final String className = System.getProperty(Configuration.SERVICE_CLASS_NAME_PROP_NAME);
                 if (null == className)
                 {
-                    throw new ClusterException(
-                        "either a ClusteredService instance or class name for the service must be provided");
+                    throw new ClusterException("either a instance or class name for the service must be provided");
                 }
 
                 try
@@ -1148,8 +1148,7 @@ public final class ClusteredServiceContainer implements AutoCloseable
         }
 
         /**
-         * Set the {@link Runnable} that is called when processing a
-         * {@link io.aeron.cluster.codecs.ClusterAction#SHUTDOWN} or {@link io.aeron.cluster.codecs.ClusterAction#ABORT}
+         * Set the {@link Runnable} that is called when container is instructed to terminate.
          *
          * @param terminationHook that can be used to terminate a service container.
          * @return this for a fluent API.
@@ -1161,11 +1160,10 @@ public final class ClusteredServiceContainer implements AutoCloseable
         }
 
         /**
-         * Get the {@link Runnable} that is called when processing a
-         * {@link io.aeron.cluster.codecs.ClusterAction#SHUTDOWN} or {@link io.aeron.cluster.codecs.ClusterAction#ABORT}
+         * Get the {@link Runnable} that is called when container is instructed to terminate.
          * <p>
          * The default action is to call signal on the {@link #shutdownSignalBarrier()}.
-
+         *
          * @return the {@link Runnable} that can be used to terminate a service container.
          */
         public Runnable terminationHook()
@@ -1257,12 +1255,12 @@ public final class ClusteredServiceContainer implements AutoCloseable
          */
         public void close()
         {
-            CloseHelper.quietClose(markFile);
-
             if (ownsAeronClient)
             {
                 CloseHelper.close(aeron);
             }
+
+            CloseHelper.close(markFile);
         }
 
         private void concludeMarkFile()

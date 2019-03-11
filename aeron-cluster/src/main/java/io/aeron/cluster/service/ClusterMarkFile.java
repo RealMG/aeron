@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.aeron.cluster.service;
 
 import io.aeron.Aeron;
+import io.aeron.cluster.client.AeronCluster;
 import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.mark.ClusterComponentType;
 import io.aeron.cluster.codecs.mark.MarkFileHeaderDecoder;
@@ -50,7 +51,6 @@ public class ClusterMarkFile implements AutoCloseable
     public static final String SERVICE_FILENAME_PREFIX = "cluster-mark-service-";
     public static final String SERVICE_FILENAME_FORMAT = SERVICE_FILENAME_PREFIX + "%d" + FILE_EXTENSION;
     public static final int HEADER_LENGTH = 8 * 1024;
-    public static final int VERSION_READY = MarkFileHeaderDecoder.SCHEMA_VERSION;
     public static final int VERSION_FAILED = -1;
 
     private final MarkFileHeaderDecoder headerDecoder = new MarkFileHeaderDecoder();
@@ -78,17 +78,14 @@ public class ClusterMarkFile implements AutoCloseable
             epochClock,
             (version) ->
             {
-                if (version != MarkFileHeaderDecoder.SCHEMA_VERSION)
+                if (VERSION_FAILED == version && markFileExists)
                 {
-                    if (VERSION_FAILED == version && markFileExists)
-                    {
-                        System.err.println("mark file version -1 indicates error on previous startup.");
-                    }
-                    else
-                    {
-                        throw new ClusterException("mark file version " + version +
-                            " does not match software:" + MarkFileHeaderDecoder.SCHEMA_VERSION);
-                    }
+                    System.err.println("mark file version -1 indicates error on previous startup.");
+                }
+                else if (SemanticVersion.major(version) != AeronCluster.Configuration.MAJOR_VERSION)
+                {
+                    throw new IllegalArgumentException("mark file major version " + SemanticVersion.major(version) +
+                        " does not match software:" + AeronCluster.Configuration.MAJOR_VERSION);
                 }
             },
             null);
@@ -144,10 +141,10 @@ public class ClusterMarkFile implements AutoCloseable
             epochClock,
             (version) ->
             {
-                if (version != MarkFileHeaderDecoder.SCHEMA_VERSION)
+                if (SemanticVersion.major(version) != AeronCluster.Configuration.MAJOR_VERSION)
                 {
-                    throw new IllegalArgumentException("mark file version " + version +
-                        " does not match software:" + MarkFileHeaderDecoder.SCHEMA_VERSION);
+                    throw new IllegalArgumentException("mark file major version " + SemanticVersion.major(version) +
+                        " does not match software:" + AeronCluster.Configuration.MAJOR_VERSION);
                 }
             },
             logger);
@@ -197,7 +194,7 @@ public class ClusterMarkFile implements AutoCloseable
 
     public void signalReady()
     {
-        markFile.signalReady(VERSION_READY);
+        markFile.signalReady(AeronCluster.Configuration.SEMANTIC_VERSION);
         markFile.mappedByteBuffer().force();
     }
 

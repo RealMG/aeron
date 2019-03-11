@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_TERM_GAP_SCANNER_H
-#define AERON_AERON_TERM_GAP_SCANNER_H
+#ifndef AERON_TERM_GAP_SCANNER_H
+#define AERON_TERM_GAP_SCANNER_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -79,4 +79,4 @@ inline int32_t aeron_term_gap_scanner_scan_for_gap(
     return gap_begin_offset;
 }
 
-#endif //AERON_AERON_TERM_GAP_SCANNER_H
+#endif //AERON_TERM_GAP_SCANNER_H

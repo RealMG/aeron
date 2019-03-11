@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -362,6 +362,14 @@ public abstract class Publication implements AutoCloseable
     }
 
     /**
+     * Available window for offering into a publication before the {@link #positionLimit()} is reached.
+     *
+     * @return  window for offering into a publication before the {@link #positionLimit()} is reached. If
+     * the publication is closed then {@link #CLOSED} will be returned.
+     */
+    public abstract long availableWindow();
+
+    /**
      * Non-blocking publish of a buffer containing a message.
      *
      * @param buffer containing message.
@@ -609,5 +617,19 @@ public abstract class Publication implements AutoCloseable
         }
 
         return totalLength;
+    }
+
+    public String toString()
+    {
+        return "Publication{" +
+            "originalRegistrationId=" + originalRegistrationId +
+            ", registrationId=" + registrationId +
+            ", initialTermId=" + initialTermId +
+            ", termBufferLength=" + termBufferLength +
+            ", sessionId=" + sessionId +
+            ", streamId=" + streamId +
+            ", channel='" + channel + '\'' +
+            ", position=" + position() +
+            '}';
     }
 }

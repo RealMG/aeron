@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ package io.aeron.cluster;
 
 import io.aeron.ControlledFragmentAssembler;
 import io.aeron.Subscription;
+import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.*;
 import io.aeron.logbuffer.ControlledFragmentHandler;
 import io.aeron.logbuffer.Header;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
+import org.agrona.collections.ArrayUtil;
 import org.agrona.concurrent.status.AtomicCounter;
 
 class IngressAdapter implements ControlledFragmentHandler, AutoCloseable
@@ -55,11 +57,18 @@ class IngressAdapter implements ControlledFragmentHandler, AutoCloseable
         fragmentAssembler.clear();
     }
 
+    @SuppressWarnings("MethodLength")
     public Action onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         messageHeaderDecoder.wrap(buffer, offset);
-        final int templateId = messageHeaderDecoder.templateId();
 
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
+        final int templateId = messageHeaderDecoder.templateId();
         if (templateId == IngressMessageHeaderDecoder.TEMPLATE_ID)
         {
             ingressMessageHeaderDecoder.wrap(
@@ -87,13 +96,22 @@ class IngressAdapter implements ControlledFragmentHandler, AutoCloseable
                     messageHeaderDecoder.version());
 
                 final String responseChannel = connectRequestDecoder.responseChannel();
-
-                final byte[] credentials = new byte[connectRequestDecoder.encodedCredentialsLength()];
-                connectRequestDecoder.getEncodedCredentials(credentials, 0, credentials.length);
+                final int credentialsLength = connectRequestDecoder.encodedCredentialsLength();
+                final byte[] credentials;
+                if (credentialsLength > 0)
+                {
+                    credentials = new byte[credentialsLength];
+                    connectRequestDecoder.getEncodedCredentials(credentials, 0, credentialsLength);
+                }
+                else
+                {
+                    credentials = ArrayUtil.EMPTY_BYTE_ARRAY;
+                }
 
                 consensusModuleAgent.onSessionConnect(
                     connectRequestDecoder.correlationId(),
                     connectRequestDecoder.responseStreamId(),
+                    connectRequestDecoder.version(),
                     responseChannel,
                     credentials);
                 break;

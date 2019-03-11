@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import io.aeron.archive.codecs.SourceLocation;
  */
 interface ControlRequestListener
 {
-    void onConnect(long correlationId, String channel, int streamId);
+    void onConnect(long correlationId, int streamId, int version, String channel);
 
     void onCloseSession(long controlSessionId);
 
@@ -52,7 +52,7 @@ interface ControlRequestListener
         long fromRecordingId,
         int recordCount,
         int streamId,
-        String channel);
+        byte[] channelFragment);
 
     void onListRecording(long controlSessionId, long correlationId, long recordingId);
 
@@ -80,5 +80,14 @@ interface ControlRequestListener
         long minRecordingId,
         int sessionId,
         int streamId,
-        String channel);
+        byte[] channelFragment);
+
+    void onListRecordingSubscriptions(
+        long controlSessionId,
+        long correlationId,
+        int pseudoIndex,
+        int subscriptionCount,
+        boolean applyStreamId,
+        int streamId,
+        String channelFragment);
 }

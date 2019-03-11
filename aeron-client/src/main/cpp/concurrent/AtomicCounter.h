@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef INCLUDED_AERON_CONCURRENT_ATOMIC_COUNTER__
-#define INCLUDED_AERON_CONCURRENT_ATOMIC_COUNTER__
+#ifndef AERON_CONCURRENT_ATOMIC_COUNTER_H
+#define AERON_CONCURRENT_ATOMIC_COUNTER_H
 
 #include <cstdint>
 #include <memory>
@@ -32,7 +32,7 @@ public:
     AtomicCounter(const AtomicBuffer& buffer, std::int32_t counterId, std::shared_ptr<CountersManager> countersManager) :
         m_buffer(buffer),
         m_counterId(counterId),
-        m_countersManager(countersManager),
+        m_countersManager(std::move(countersManager)),
         m_offset(CountersManager::counterOffset(counterId))
     {
         m_buffer.putInt64(m_offset, 0);
@@ -46,7 +46,7 @@ public:
     {
     }
 
-    virtual ~AtomicCounter()
+    ~AtomicCounter()
     {
         if (nullptr != m_countersManager)
         {

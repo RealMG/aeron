@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef INCLUDED_AERON_COMMAND_REMOVEMESSAGEFLYWEIGHT__
-#define INCLUDED_AERON_COMMAND_REMOVEMESSAGEFLYWEIGHT__
+#ifndef AERON_COMMAND_REMOVE_MESSAGE_FLYWEIGHT_H
+#define AERON_COMMAND_REMOVE_MESSAGE_FLYWEIGHT_H
 
 #include <cstdint>
 #include <string>
@@ -53,8 +53,8 @@ struct RemoveMessageDefn
 class RemoveMessageFlyweight : public CorrelatedMessageFlyweight
 {
 public:
-    inline RemoveMessageFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset)
-        : CorrelatedMessageFlyweight(buffer, offset), m_struct(overlayStruct<RemoveMessageDefn>(0))
+    inline RemoveMessageFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset) :
+        CorrelatedMessageFlyweight(buffer, offset), m_struct(overlayStruct<RemoveMessageDefn>(0))
     {
     }
 

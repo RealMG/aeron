@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,6 @@ class LogReplay implements AutoCloseable
     public void close()
     {
         CloseHelper.close(logSubscription);
-        CloseHelper.close(logAdapter);
     }
 
     int doWork(@SuppressWarnings("unused") final long nowMs)
@@ -111,8 +110,6 @@ class LogReplay implements AutoCloseable
 
                     logSubscription.close();
                     logSubscription = null;
-
-                    logAdapter.close();
                     logAdapter = null;
 
                     state = State.DONE;

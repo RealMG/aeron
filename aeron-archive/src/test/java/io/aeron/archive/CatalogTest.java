@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import io.aeron.archive.codecs.RecordingDescriptorDecoder;
 import io.aeron.archive.codecs.RecordingDescriptorHeaderDecoder;
 import io.aeron.protocol.DataHeaderFlyweight;
 import org.agrona.IoUtil;
+import org.agrona.collections.ArrayUtil;
 import org.agrona.concurrent.EpochClock;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.After;
@@ -29,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -378,6 +380,50 @@ public class CatalogTest
 
         final Catalog catalog = new Catalog(archiveDir, null, 0, MAX_ENTRIES, clock);
         catalog.close();
+    }
+
+    @Test
+    public void shouldContainChannelFragment()
+    {
+        try (Catalog catalog = new Catalog(archiveDir, clock))
+        {
+            final String originalChannel = "aeron:udp?endpoint=localhost:7777|tags=777|alias=TestString";
+            final String strippedChannel = "strippedChannelUri";
+            final long recordingId = catalog.addNewRecording(
+                0L,
+                0L,
+                0,
+                SEGMENT_LENGTH,
+                TERM_LENGTH,
+                MTU_LENGTH,
+                6,
+                1,
+                strippedChannel,
+                originalChannel,
+                "sourceA");
+
+            assertTrue(catalog.wrapDescriptor(recordingId, unsafeBuffer));
+
+            recordingDescriptorDecoder.wrap(
+                unsafeBuffer,
+                RecordingDescriptorHeaderDecoder.BLOCK_LENGTH,
+                RecordingDescriptorDecoder.BLOCK_LENGTH,
+                RecordingDescriptorDecoder.SCHEMA_VERSION);
+
+            assertTrue(Catalog.originalChannelContains(recordingDescriptorDecoder, ArrayUtil.EMPTY_BYTE_ARRAY));
+
+            final byte[] originalChannelBytes = originalChannel.getBytes(StandardCharsets.US_ASCII);
+            assertTrue(Catalog.originalChannelContains(recordingDescriptorDecoder, originalChannelBytes));
+
+            final byte[] tagsBytes = "tags=777".getBytes(StandardCharsets.US_ASCII);
+            assertTrue(Catalog.originalChannelContains(recordingDescriptorDecoder, tagsBytes));
+
+            final byte[] testBytes = "TestString".getBytes(StandardCharsets.US_ASCII);
+            assertTrue(Catalog.originalChannelContains(recordingDescriptorDecoder, testBytes));
+
+            final byte[] wrongBytes = "wrong".getBytes(StandardCharsets.US_ASCII);
+            assertFalse(Catalog.originalChannelContains(recordingDescriptorDecoder, wrongBytes));
+        }
     }
 
     private void createSegmentFile(final long newRecordingId) throws IOException

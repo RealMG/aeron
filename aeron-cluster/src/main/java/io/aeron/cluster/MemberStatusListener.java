@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,12 @@ interface MemberStatusListener
         boolean vote);
 
     void onNewLeadershipTerm(
-        long logLeadershipTermId, long logPosition, long leadershipTermId, int leaderMemberId, int logSessionId);
+        long logLeadershipTermId,
+        long logPosition,
+        long leadershipTermId,
+        long maxLogPosition,
+        int leaderMemberId,
+        int logSessionId);
 
     void onAppendedPosition(long leadershipTermId, long logPosition, int followerMemberId);
 
@@ -40,7 +45,7 @@ interface MemberStatusListener
 
     void onCatchupPosition(long leadershipTermId, long logPosition, int followerMemberId);
 
-    void onStopCatchup(int replaySessionId, int followerMemberId);
+    void onStopCatchup(long leadershiptTermId, long logPosition, int followerMemberId);
 
     void onAddPassiveMember(long correlationId, String memberEndpoints);
 
@@ -51,4 +56,8 @@ interface MemberStatusListener
     void onSnapshotRecordings(long correlationId, SnapshotRecordingsDecoder snapshotRecordingsDecoder);
 
     void onJoinCluster(long leadershipTermId, int memberId);
+
+    void onTerminationPosition(long logPosition);
+
+    void onTerminationAck(long logPosition, int memberId);
 }

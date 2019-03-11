@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERM_APPENDER__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERM_APPENDER__
+#ifndef AERON_CONCURRENT_LOGBUFFER_TERM_APPENDER_H
+#define AERON_CONCURRENT_LOGBUFFER_TERM_APPENDER_H
 
 #include <functional>
 #include <util/Index.h>
@@ -268,7 +268,7 @@ public:
     {
         const int numMaxPayloads = length / maxPayloadLength;
         const util::index_t remainingPayload = length % maxPayloadLength;
-        const util::index_t lastFrameLength = (remainingPayload > 0) ?
+        const util::index_t lastFrameLength = remainingPayload > 0 ?
             util::BitUtil::align(remainingPayload + DataFrameHeader::LENGTH, FrameDescriptor::FRAME_ALIGNMENT) : 0;
         const util::index_t requiredLength =
             (numMaxPayloads * (maxPayloadLength + DataFrameHeader::LENGTH)) + lastFrameLength;
@@ -353,8 +353,8 @@ private:
         if (termId != expectedTermId)
         {
             throw util::IllegalStateException(
-                util::strPrintf("Action possibly delayed: expectedTermId=%d termId=%d",
-                    expectedTermId, termId), SOURCEINFO);
+                "action possibly delayed: expectedTermId=" + std::to_string(expectedTermId) +
+                " termId=" + std::to_string(termId), SOURCEINFO);
         }
     }
 

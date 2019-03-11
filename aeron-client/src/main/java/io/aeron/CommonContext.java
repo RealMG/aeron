@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ import static java.lang.System.getProperty;
  * <li><code>aeron.dir</code>: Use value as directory name for Aeron buffers and status.</li>
  * </ul>
  */
-public class CommonContext implements AutoCloseable, Cloneable
+public class CommonContext implements Cloneable
 {
     /**
      * Property name for driver timeout after which the driver is considered inactive.
@@ -156,16 +156,6 @@ public class CommonContext implements AutoCloseable, Cloneable
     public static final String MDC_CONTROL_MODE_PARAM_NAME = "control-mode";
 
     /**
-     * Key for the session id for a publication or restricted subscription.
-     */
-    public static final String SESSION_ID_PARAM_NAME = "session-id";
-
-    /**
-     * Key for the linger timeout for a publication to wait around after draining in nanoseconds.
-     */
-    public static final String LINGER_PARAM_NAME = "linger";
-
-    /**
      * Valid value for {@link #MDC_CONTROL_MODE_PARAM_NAME} when manual control is desired.
      */
     public static final String MDC_CONTROL_MODE_MANUAL = "manual";
@@ -174,6 +164,16 @@ public class CommonContext implements AutoCloseable, Cloneable
      * Valid value for {@link #MDC_CONTROL_MODE_PARAM_NAME} when dynamic control is desired. Default value.
      */
     public static final String MDC_CONTROL_MODE_DYNAMIC = "dynamic";
+
+    /**
+     * Key for the session id for a publication or restricted subscription.
+     */
+    public static final String SESSION_ID_PARAM_NAME = "session-id";
+
+    /**
+     * Key for the linger timeout for a publication to wait around after draining in nanoseconds.
+     */
+    public static final String LINGER_PARAM_NAME = "linger";
 
     /**
      * Parameter name for channel URI param to indicate if a subscribed must be reliable or not. Value is boolean.
@@ -186,9 +186,19 @@ public class CommonContext implements AutoCloseable, Cloneable
     public static final String TAGS_PARAM_NAME = "tags";
 
     /**
+     * Qualifier for a value which is a tag for reference. This prefix is use in the param value.
+     */
+    public static final String TAG_PREFIX = "tag:";
+
+    /**
      * Parameter name for channel URI param to indicate if term buffers should be sparse. Value is boolean.
      */
     public static final String SPARSE_PARAM_NAME = "sparse";
+
+    /**
+     * Parameter name for channel URI param to indicate an alias for the given URI. Value not interpreted by Aeron.
+     */
+    public static final String ALIAS_PARAM_NAME = "alias";
 
     private long driverTimeoutMs = DRIVER_TIMEOUT_MS;
     private String aeronDirectoryName = getAeronDirectoryName();
@@ -213,7 +223,7 @@ public class CommonContext implements AutoCloseable, Cloneable
 
         if (null == baseDirName)
         {
-            baseDirName = IoUtil.tmpDirName() + "aeron";
+            baseDirName = SystemUtil.tmpDirName() + "aeron";
         }
 
         AERON_DIR_PROP_DEFAULT = baseDirName + '-' + System.getProperty("user.name", "default");

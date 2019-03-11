@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_UDP_PROTOCOL_H
-#define AERON_AERON_UDP_PROTOCOL_H
+#ifndef AERON_UDP_PROTOCOL_H
+#define AERON_UDP_PROTOCOL_H
 
 #include <stdint.h>
 
@@ -113,4 +113,4 @@ aeron_rttm_header_t;
 
 #define AERON_RTTM_HEADER_REPLY_FLAG ((uint8_t)(0x80))
 
-#endif //AERON_AERON_UDP_PROTOCOL_H
+#endif //AERON_UDP_PROTOCOL_H

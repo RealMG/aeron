@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_AERON__
-#define INCLUDED_AERON_AERON__
+#ifndef INCLUDED_AERON_H
+#define INCLUDED_AERON_H
 
 #include <util/Exceptions.h>
 #include <iostream>
@@ -64,7 +64,8 @@ public:
      * @param context for configuration of the client.
      */
     Aeron(Context& context);
-    virtual ~Aeron();
+
+    ~Aeron();
 
     /**
      * Create an Aeron instance and connect to the media driver.
@@ -77,6 +78,20 @@ public:
     inline static std::shared_ptr<Aeron> connect(Context& context)
     {
         return std::make_shared<Aeron>(context);
+    }
+
+    /**
+     * Create an Aeron instance and connect to the media driver.
+     * <p>
+     * Threads required for interacting with the media driver are created and managed within the Aeron instance.
+     *
+     * @return the new Aeron instance connected to the Media Driver.
+     */
+    inline static std::shared_ptr<Aeron> connect()
+    {
+        Context ctx;
+
+        return std::make_shared<Aeron>(ctx);
     }
 
     /**
@@ -274,6 +289,16 @@ public:
     }
 
     /**
+     * Return whether the AgentInvoker is used or not.
+     *
+     * @return true if AgentInvoker used or false if not.
+     */
+    inline bool usesAgentInvoker() const
+    {
+        return m_context.m_useConductorAgentInvoker;
+    }
+
+    /**
      * Get the CountersReader for the Aeron media driver counters.
      *
      * @return CountersReader for the Aeron media driver in use.
@@ -283,12 +308,32 @@ public:
         return m_conductor.countersReader();
     }
 
+    /**
+     * Get the client identity that has been allocated for communicating with the media driver.
+     *
+     * @return the client identity that has been allocated for communicating with the media driver.
+     */
+    inline std::int64_t clientId()
+    {
+        return m_driverProxy.clientId();
+    }
+
+    /**
+     * Get the Aeron Context object used in construction of the Aeron instance.
+     *
+     * @return Context instance in use.
+     */
+    inline Context& context()
+    {
+        return m_context;
+    }
+
 private:
     std::random_device m_randomDevice;
     std::default_random_engine m_randomEngine;
     std::uniform_int_distribution<std::int32_t> m_sessionIdDistribution;
 
-    Context& m_context;
+    Context m_context;
 
     MemoryMappedFile::ptr_t m_cncBuffer;
 

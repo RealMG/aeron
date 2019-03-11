@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef AERON_ERRORLOGREADER_H
-#define AERON_ERRORLOGREADER_H
+#ifndef AERON_CONCURRENT_ERROR_LOG_READER_H
+#define AERON_CONCURRENT_ERROR_LOG_READER_H
 
 #include <functional>
 #include <util/Index.h>
@@ -22,11 +22,7 @@
 #include <util/BitUtil.h>
 #include "ErrorLogDescriptor.h"
 
-namespace aeron {
-
-namespace concurrent {
-
-namespace errors {
+namespace aeron { namespace concurrent { namespace errors {
 
 namespace ErrorLogReader {
 
@@ -54,7 +50,7 @@ inline static int read(
         }
 
         const std::int64_t lastObservationTimestamp =
-            buffer.getInt64Volatile(offset + ErrorLogDescriptor::LAST_OBERSATION_TIMESTAMP_OFFSET);
+            buffer.getInt64Volatile(offset + ErrorLogDescriptor::LAST_OBSERVATION_TIMESTAMP_OFFSET);
 
         if (lastObservationTimestamp >= sinceTimestamp)
         {

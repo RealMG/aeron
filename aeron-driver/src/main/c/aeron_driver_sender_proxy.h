@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_DRIVER_SENDER_PROXY_H
-#define AERON_AERON_DRIVER_SENDER_PROXY_H
+#ifndef AERON_DRIVER_SENDER_PROXY_H
+#define AERON_DRIVER_SENDER_PROXY_H
 
 #include "aeron_driver_context.h"
 
@@ -58,4 +58,4 @@ void aeron_driver_sender_proxy_on_add_destination(
 void aeron_driver_sender_proxy_on_remove_destination(
     aeron_driver_sender_proxy_t *sender_proxy, aeron_send_channel_endpoint_t *endpoint, struct sockaddr_storage *addr);
 
-#endif //AERON_AERON_DRIVER_SENDER_PROXY_H
+#endif //AERON_DRIVER_SENDER_PROXY_H

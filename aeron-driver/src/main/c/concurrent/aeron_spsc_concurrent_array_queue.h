@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef AERON_AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H
-#define AERON_AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H
+#ifndef AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H
+#define AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H
 
 #include <stdint.h>
 #include "util/aeron_bitutil.h"
@@ -32,12 +31,14 @@ typedef struct aeron_spsc_concurrent_array_queue_stct
         int8_t padding[(2 * AERON_CACHE_LINE_LENGTH) - (2 * sizeof(uint64_t))];
     }
     producer;
+
     struct
     {
         uint64_t head;
         int8_t padding[(2 * AERON_CACHE_LINE_LENGTH) - (1 * sizeof(uint64_t))];
     }
     consumer;
+
     uint64_t capacity;
     uint64_t mask;
     volatile void **buffer;
@@ -59,9 +60,7 @@ inline aeron_queue_offer_result_t aeron_spsc_concurrent_array_queue_offer(
 
     uint64_t current_head = queue->producer.head_cache;
     uint64_t buffer_limit = current_head + queue->capacity;
-
-    uint64_t current_tail;
-    AERON_GET_VOLATILE(current_tail, queue->producer.tail);
+    uint64_t current_tail = queue->producer.tail;
 
     if (current_tail >= buffer_limit)
     {
@@ -73,13 +72,14 @@ inline aeron_queue_offer_result_t aeron_spsc_concurrent_array_queue_offer(
             return AERON_OFFER_FULL;
         }
 
-        queue->producer.head_cache;
+        queue->producer.head_cache = current_head;
     }
 
     const uint64_t index = current_tail & queue->mask;
 
     AERON_PUT_ORDERED(queue->buffer[index], element);
     AERON_PUT_ORDERED(queue->producer.tail, current_tail + 1);
+
     return AERON_OFFER_SUCCESS;
 }
 
@@ -89,9 +89,7 @@ inline uint64_t aeron_spsc_concurrent_array_queue_drain(
     void *clientd,
     uint64_t limit)
 {
-    uint64_t current_head;
-    AERON_GET_VOLATILE(current_head, queue->consumer.head);
-
+    uint64_t current_head = queue->consumer.head;
     uint64_t next_sequence = current_head;
     const uint64_t limit_sequence = next_sequence + limit;
 
@@ -120,8 +118,7 @@ inline uint64_t aeron_spsc_concurrent_array_queue_drain_all(
     aeron_queue_drain_func_t func,
     void *clientd)
 {
-    uint64_t current_head;
-    AERON_GET_VOLATILE(current_head, queue->consumer.head);
+    uint64_t current_head = queue->consumer.head;
     uint64_t current_tail;
     AERON_GET_VOLATILE(current_tail, queue->producer.tail);
 
@@ -147,4 +144,4 @@ inline uint64_t aeron_spsc_concurrent_array_queue_size(volatile aeron_spsc_concu
     return current_tail - current_head_after;
 }
 
-#endif //AERON_AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H
+#endif //AERON_SPSC_CONCURRENT_ARRAY_QUEUE_H

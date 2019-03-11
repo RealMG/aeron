@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import io.aeron.driver.ThreadingMode;
 import io.aeron.logbuffer.FragmentHandler;
 import org.agrona.CloseHelper;
 import org.agrona.ExpandableArrayBuffer;
-import org.agrona.IoUtil;
+import org.agrona.SystemUtil;
 import org.agrona.collections.MutableInteger;
 import org.agrona.concurrent.status.CountersReader;
 import org.junit.After;
@@ -43,7 +43,7 @@ public class ExtendRecordingTest
     private static final long MAX_CATALOG_ENTRIES = 1024;
     private static final int FRAGMENT_LIMIT = 10;
     private static final int TERM_BUFFER_LENGTH = 64 * 1024;
-    private static final int MTU_LENGTH = Configuration.MTU_LENGTH;
+    private static final int MTU_LENGTH = Configuration.mtuLength();
 
     private static final int RECORDING_STREAM_ID = 33;
     private static final String RECORDING_CHANNEL = new ChannelUriStringBuilder()
@@ -232,7 +232,7 @@ public class ExtendRecordingTest
 
         if (null == archiveDir)
         {
-            archiveDir = new File(IoUtil.tmpDirName(), "archive");
+            archiveDir = new File(SystemUtil.tmpDirName(), "archive");
         }
 
         archivingMediaDriver = ArchivingMediaDriver.launch(

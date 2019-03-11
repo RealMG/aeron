@@ -1,5 +1,5 @@
 /*
- *  Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,7 +177,18 @@ public class EgressPoller implements ControlledFragmentHandler
     public ControlledFragmentAssembler.Action onFragment(
         final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
+        if (pollComplete)
+        {
+            return Action.ABORT;
+        }
+
         messageHeaderDecoder.wrap(buffer, offset);
+
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
 
         templateId = messageHeaderDecoder.templateId();
         switch (templateId)
@@ -195,7 +206,8 @@ public class EgressPoller implements ControlledFragmentHandler
                 leaderMemberId = sessionEventDecoder.leaderMemberId();
                 eventCode = sessionEventDecoder.code();
                 detail = sessionEventDecoder.detail();
-                break;
+                pollComplete = true;
+                return Action.BREAK;
 
             case NewLeaderEventDecoder.TEMPLATE_ID:
                 newLeaderEventDecoder.wrap(
@@ -208,7 +220,8 @@ public class EgressPoller implements ControlledFragmentHandler
                 leadershipTermId = newLeaderEventDecoder.leadershipTermId();
                 leaderMemberId = newLeaderEventDecoder.leaderMemberId();
                 detail = newLeaderEventDecoder.memberEndpoints();
-                break;
+                pollComplete = true;
+                return Action.BREAK;
 
             case EgressMessageHeaderDecoder.TEMPLATE_ID:
                 egressMessageHeaderDecoder.wrap(
@@ -219,7 +232,8 @@ public class EgressPoller implements ControlledFragmentHandler
 
                 leadershipTermId = egressMessageHeaderDecoder.leadershipTermId();
                 clusterSessionId = egressMessageHeaderDecoder.clusterSessionId();
-                break;
+                pollComplete = true;
+                return Action.BREAK;
 
             case ChallengeDecoder.TEMPLATE_ID:
                 challengeDecoder.wrap(
@@ -233,14 +247,10 @@ public class EgressPoller implements ControlledFragmentHandler
 
                 clusterSessionId = challengeDecoder.clusterSessionId();
                 correlationId = challengeDecoder.correlationId();
-                break;
-
-            default:
-                throw new ClusterException("unknown templateId: " + templateId);
+                pollComplete = true;
+                return Action.BREAK;
         }
 
-        pollComplete = true;
-
-        return ControlledFragmentAssembler.Action.BREAK;
+        return Action.CONTINUE;
     }
 }

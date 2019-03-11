@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,9 +41,7 @@ import static io.aeron.cluster.ConsensusModule.Configuration.*;
 import static io.aeron.cluster.service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME;
 import static io.aeron.cluster.service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME;
 import static io.aeron.driver.status.SystemCounterDescriptor.SYSTEM_COUNTER_TYPE_ID;
-import static org.agrona.SystemUtil.getDurationInNanos;
-import static org.agrona.SystemUtil.getSizeAsInt;
-import static org.agrona.SystemUtil.loadPropertiesFiles;
+import static org.agrona.SystemUtil.*;
 import static org.agrona.concurrent.status.CountersReader.METADATA_LENGTH;
 
 /**
@@ -51,7 +49,6 @@ import static org.agrona.concurrent.status.CountersReader.METADATA_LENGTH;
  */
 public class ConsensusModule implements AutoCloseable
 {
-
     /**
      * Possible states for the {@link ConsensusModule}.
      * These will be reflected in the {@link Context#moduleStateCounter()} counter.
@@ -79,24 +76,19 @@ public class ConsensusModule implements AutoCloseable
         SNAPSHOT(3),
 
         /**
-         * In the process of doing an orderly shutdown taking a snapshot first.
-         */
-        SHUTDOWN(4),
-
-        /**
-         * Aborting processing and shutting down as soon as services ack without taking a snapshot.
-         */
-        ABORT(5),
-
-        /**
          * Leaving cluster and shutting down as soon as services ack without taking a snapshot.
          */
-        LEAVING(6),
+        LEAVING(4),
+
+        /**
+         * In the process of terminating the node.
+         */
+        TERMINATING(5),
 
         /**
          * Terminal state.
          */
-        CLOSED(7);
+        CLOSED(6);
 
         static final State[] STATES;
 
@@ -183,6 +175,7 @@ public class ConsensusModule implements AutoCloseable
                 ctx.markFile.signalFailedStart();
             }
 
+            ctx.close();
             throw ex;
         }
 
@@ -230,7 +223,6 @@ public class ConsensusModule implements AutoCloseable
     public void close()
     {
         CloseHelper.close(conductorRunner);
-        CloseHelper.close(ctx);
     }
 
     /**
@@ -369,9 +361,19 @@ public class ConsensusModule implements AutoCloseable
         public static final String SESSION_TIMEOUT_MSG = "Session inactive";
 
         /**
+         * Message detail to be sent when a session is terminated by a service.
+         */
+        public static final String SESSION_TERMINATED_MSG = "Session terminated";
+
+        /**
          * Message detail to be sent when a session is rejected due to authentication.
          */
         public static final String SESSION_REJECTED_MSG = "Session failed authentication";
+
+        /**
+         * Message detail to be sent when a session has an invalid client version.
+         */
+        public static final String SESSION_INVALID_VERSION_MSG = "Incorrect client version";
 
         /**
          * Channel to be used communicating cluster member status to each other. This can be used for default
@@ -563,6 +565,16 @@ public class ConsensusModule implements AutoCloseable
         public static final int LOG_PUBLICATION_SESSION_ID_TAG = 2;
         public static final String LOG_PUBLICATION_TAGS = "1," + LOG_PUBLICATION_SESSION_ID_TAG;
         public static final String LOG_SUBSCRIPTION_TAGS = "3,4";
+
+        /**
+         * Timeout waiting for follower termination by leader.
+         */
+        public static final String TERMINATION_TIMEOUT_PROP_NAME = "aeron.cluster.termination.timeout";
+
+        /**
+         * Timeout waiting for follower termination by leader.
+         */
+        public static final long TERMINATION_TIMEOUT_DEFAULT_NS = TimeUnit.SECONDS.toNanos(5);
 
         /**
          * The value {@link #CLUSTER_MEMBER_ID_DEFAULT} or system property
@@ -795,6 +807,17 @@ public class ConsensusModule implements AutoCloseable
         }
 
         /**
+         * Timeout waiting for follower termination by leader.
+         *
+         * @return timeout in nanoseconds to wait followers to terminate.
+         * @see #TERMINATION_TIMEOUT_PROP_NAME
+         */
+        public static long terminationTimeoutNs()
+        {
+            return getDurationInNanos(TERMINATION_TIMEOUT_PROP_NAME, TERMINATION_TIMEOUT_DEFAULT_NS);
+        }
+
+        /**
          * Size in bytes of the error buffer in the mark file.
          *
          * @return length of error buffer in bytes.
@@ -857,8 +880,11 @@ public class ConsensusModule implements AutoCloseable
 
     /**
      * Programmable overrides for configuring the {@link ConsensusModule} in a cluster.
+     * <p>
+     * The context will be owned by {@link ConsensusModuleAgent} after a successful
+     * {@link ConsensusModule#launch(Context)} and closed via {@link ConsensusModule#close()}.
      */
-    public static class Context implements AutoCloseable, Cloneable
+    public static class Context implements Cloneable
     {
         private boolean ownsAeronClient = false;
         private String aeronDirectoryName = CommonContext.getAeronDirectoryName();
@@ -903,6 +929,7 @@ public class ConsensusModule implements AutoCloseable
         private long electionTimeoutNs = Configuration.electionTimeoutNs();
         private long electionStatusIntervalNs = Configuration.electionStatusIntervalNs();
         private long dynamicJoinIntervalNs = Configuration.dynamicJoinIntervalNs();
+        private long terminationTimeoutNs = Configuration.terminationTimeoutNs();
 
         private ThreadFactory threadFactory;
         private Supplier<IdleStrategy> idleStrategySupplier;
@@ -1992,6 +2019,32 @@ public class ConsensusModule implements AutoCloseable
         }
 
         /**
+         * Timeout to wait for follower termination by leader.
+         *
+         * @param terminationTimeoutNs to wait for follower termination.
+         * @return this for a fluent API.
+         * @see Configuration#TERMINATION_TIMEOUT_PROP_NAME
+         * @see Configuration#TERMINATION_TIMEOUT_DEFAULT_NS
+         */
+        public Context terminationTimeoutNs(final long terminationTimeoutNs)
+        {
+            this.terminationTimeoutNs = terminationTimeoutNs;
+            return this;
+        }
+
+        /**
+         * Timeout to wait for follower termination by leader.
+         *
+         * @return timeout to wait for follower termination by leader.
+         * @see Configuration#TERMINATION_TIMEOUT_PROP_NAME
+         * @see Configuration#TERMINATION_TIMEOUT_DEFAULT_NS
+         */
+        public long terminationTimeoutNs()
+        {
+            return terminationTimeoutNs;
+        }
+
+        /**
          * Get the thread factory used for creating threads.
          *
          * @return thread factory used for creating threads.
@@ -2425,8 +2478,7 @@ public class ConsensusModule implements AutoCloseable
         }
 
         /**
-         * Set the {@link Runnable} that is called when the {@link ConsensusModule} processes a termination action such
-         * as a {@link ConsensusModule.State#SHUTDOWN} or {@link ConsensusModule.State#ABORT}.
+         * Set the {@link Runnable} that is called when the {@link ConsensusModule} processes a termination action.
          *
          * @param terminationHook that can be used to terminate a consensus module.
          * @return this for a fluent API.
@@ -2438,8 +2490,7 @@ public class ConsensusModule implements AutoCloseable
         }
 
         /**
-         * Get the {@link Runnable} that is called when the {@link ConsensusModule} processes a termination action such
-         * as a {@link ConsensusModule.State#SHUTDOWN} or {@link ConsensusModule.State#ABORT}.
+         * Get the {@link Runnable} that is called when the {@link ConsensusModule} processes a termination action.
          * <p>
          * The default action is to call signal on the {@link #shutdownSignalBarrier()}.
          *
@@ -2578,9 +2629,6 @@ public class ConsensusModule implements AutoCloseable
          */
         public void close()
         {
-            CloseHelper.close(markFile);
-            CloseHelper.close(recordingLog);
-
             if (ownsAeronClient)
             {
                 CloseHelper.close(aeron);
@@ -2593,6 +2641,9 @@ public class ConsensusModule implements AutoCloseable
                 CloseHelper.close(controlToggle);
                 CloseHelper.close(snapshotCounter);
             }
+
+            CloseHelper.close(recordingLog);
+            CloseHelper.close(markFile);
         }
 
         private void concludeMarkFile()

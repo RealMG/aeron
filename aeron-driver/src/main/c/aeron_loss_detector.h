@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_LOSS_DETECTOR_H
-#define AERON_AERON_LOSS_DETECTOR_H
+#ifndef AERON_LOSS_DETECTOR_H
+#define AERON_LOSS_DETECTOR_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -71,9 +71,8 @@ inline int64_t aeron_loss_detector_nak_unicast_delay_generator()
     return AERON_LOSS_DETECTOR_NAK_UNICAST_DELAY_NS;
 }
 
-#define AERON_LOSS_DETECTOR_NAK_MULTICAST_GROUPSIZE (10.0)
-#define AERON_LOSS_DETECTOR_NAK_MULTICAST_GRTT (10.0)
-#define AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF (60.0 * 1000.0 * 1000.0)
+#define AERON_LOSS_DETECTOR_NAK_MULTICAST_GROUP_SIZE (10.0)
+#define AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF_NS (60.0 * 1000.0 * 1000.0)
 
 int64_t aeron_loss_detector_nak_multicast_delay_generator();
 
@@ -121,4 +120,4 @@ inline void aeron_loss_detector_check_timer_expiry(aeron_loss_detector_t *detect
     }
 }
 
-#endif //AERON_AERON_LOSS_DETECTOR_H
+#endif //AERON_LOSS_DETECTOR_H

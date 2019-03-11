@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,21 +20,11 @@ import io.aeron.driver.MediaDriver;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 
-import static io.aeron.driver.status.SystemCounterDescriptor.INVALID_PACKETS;
-
 public class ReceiveDestinationUdpTransport extends UdpChannelTransport
 {
-    public ReceiveDestinationUdpTransport(
-        final UdpChannel udpChannel,
-        final MediaDriver.Context context)
+    public ReceiveDestinationUdpTransport(final UdpChannel udpChannel, final MediaDriver.Context context)
     {
-        super(
-            udpChannel,
-            udpChannel.remoteData(),
-            udpChannel.remoteData(),
-            null,
-            context.errorLog(),
-            context.systemCounters().get(INVALID_PACKETS));
+        super(udpChannel, udpChannel.remoteData(), udpChannel.remoteData(), null, context);
     }
 
     public void openChannel()

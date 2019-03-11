@@ -1,5 +1,5 @@
 /*
- *  Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@ class MemberStatusPublisher
     private final SnapshotRecordingQueryEncoder snapshotRecordingQueryEncoder = new SnapshotRecordingQueryEncoder();
     private final SnapshotRecordingsEncoder snapshotRecordingsEncoder = new SnapshotRecordingsEncoder();
     private final JoinClusterEncoder joinClusterEncoder = new JoinClusterEncoder();
+    private final TerminationPositionEncoder terminationPositionEncoder = new TerminationPositionEncoder();
+    private final TerminationAckEncoder terminationAckEncoder = new TerminationAckEncoder();
 
     void canvassPosition(
         final Publication publication,
@@ -147,6 +149,7 @@ class MemberStatusPublisher
         final long logLeadershipTermId,
         final long logPosition,
         final long leadershipTermId,
+        final long maxLogPosition,
         final int leaderMemberId,
         final int logSessionId)
     {
@@ -163,6 +166,7 @@ class MemberStatusPublisher
                     .logLeadershipTermId(logLeadershipTermId)
                     .logPosition(logPosition)
                     .leadershipTermId(leadershipTermId)
+                    .maxLogPosition(maxLogPosition)
                     .leaderMemberId(leaderMemberId)
                     .logSessionId(logSessionId);
 
@@ -261,7 +265,8 @@ class MemberStatusPublisher
         return false;
     }
 
-    boolean stopCatchup(final Publication publication, final int replaySessionId, final int followerMemberId)
+    boolean stopCatchup(
+        final Publication publication, final long leadershipTermId, final long logPosition, final int followerMemberId)
     {
         final int length = MessageHeaderEncoder.ENCODED_LENGTH + StopCatchupEncoder.BLOCK_LENGTH;
 
@@ -273,7 +278,8 @@ class MemberStatusPublisher
             {
                 stopCatchupEncoder
                     .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
-                    .replaySessionId(replaySessionId)
+                    .leadershipTermId(leadershipTermId)
+                    .logPosition(logPosition)
                     .followerMemberId(followerMemberId);
 
                 bufferClaim.commit();
@@ -441,6 +447,64 @@ class MemberStatusPublisher
                 joinClusterEncoder
                     .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
                     .leadershipTermId(leadershipTermId)
+                    .memberId(memberId);
+
+                bufferClaim.commit();
+
+                return true;
+            }
+
+            checkResult(result);
+        }
+        while (--attempts > 0);
+
+        return false;
+    }
+
+    boolean terminationPosition(
+        final Publication publication,
+        final long logPosition)
+    {
+        final int length = MessageHeaderEncoder.ENCODED_LENGTH + TerminationPositionEncoder.BLOCK_LENGTH;
+
+        int attempts = SEND_ATTEMPTS;
+        do
+        {
+            final long result = publication.tryClaim(length, bufferClaim);
+            if (result > 0)
+            {
+                terminationPositionEncoder
+                    .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
+                    .logPosition(logPosition);
+
+                bufferClaim.commit();
+
+                return true;
+            }
+
+            checkResult(result);
+        }
+        while (--attempts > 0);
+
+        return false;
+    }
+
+    boolean terminationAck(
+        final Publication publication,
+        final long logPosition,
+        final int memberId)
+    {
+        final int length = MessageHeaderEncoder.ENCODED_LENGTH + TerminationAckEncoder.BLOCK_LENGTH;
+
+        int attempts = SEND_ATTEMPTS;
+        do
+        {
+            final long result = publication.tryClaim(length, bufferClaim);
+            if (result > 0)
+            {
+                terminationAckEncoder
+                    .wrapAndApplyHeader(bufferClaim.buffer(), bufferClaim.offset(), messageHeaderEncoder)
+                    .logPosition(logPosition)
                     .memberId(memberId);
 
                 bufferClaim.commit();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@ using namespace aeron::concurrent;
 using namespace aeron;
 
 #define TERM_LENGTH (LogBufferDescriptor::TERM_MIN_LENGTH)
-#define PAGE_SIZE (LogBufferDescriptor::PAGE_MIN_SIZE)
+#define PAGE_SIZE (LogBufferDescriptor::AERON_PAGE_MIN_SIZE)
 #define LOG_META_DATA_LENGTH (LogBufferDescriptor::LOG_META_DATA_LENGTH)
 #define SRC_BUFFER_LENGTH 1024
 
-static_assert(LogBufferDescriptor::PARTITION_COUNT==3, "partition count assumed to be 3 for these test");
+static_assert(LogBufferDescriptor::PARTITION_COUNT == 3, "partition count assumed to be 3 for these test");
 
 typedef std::array<std::uint8_t, ((TERM_LENGTH * 3) + LOG_META_DATA_LENGTH)> term_buffer_t;
 typedef std::array<std::uint8_t, SRC_BUFFER_LENGTH> src_buffer_t;
@@ -41,7 +41,7 @@ static const std::int32_t TERM_ID_1 = 1;
 
 inline std::int64_t rawTailValue(std::int32_t termId, std::int64_t position)
 {
-    return (static_cast<std::int64_t>(termId) << 32) | position;
+    return (termId * ((int64_t(1) << 32))) | position;
 }
 
 inline util::index_t termTailCounterOffset(const int index)
@@ -149,7 +149,7 @@ TEST_F(ExclusivePublicationTest, shouldEnsureThePublicationIsOpenBeforeOffer)
 
 TEST_F(ExclusivePublicationTest, shouldEnsureThePublicationIsOpenBeforeClaim)
 {
-    ExclusiveBufferClaim bufferClaim;
+    BufferClaim bufferClaim;
 
     createPub();
     m_publication->close();
@@ -218,7 +218,7 @@ TEST_F(ExclusivePublicationTest, shouldRotateWhenClaimTrips)
 
     createPub();
 
-    ExclusiveBufferClaim bufferClaim;
+    BufferClaim bufferClaim;
     EXPECT_EQ(m_publication->position(), initialPosition);
     EXPECT_EQ(m_publication->tryClaim(SRC_BUFFER_LENGTH, bufferClaim), ADMIN_ACTION);
 

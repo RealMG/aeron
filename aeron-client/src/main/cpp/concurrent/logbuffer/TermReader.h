@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERM_READER__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERM_READER__
+#ifndef AERON_CONCURRENT_LOGBUFFER_TERM_READER_H
+#define AERON_CONCURRENT_LOGBUFFER_TERM_READER_H
 
 #include <functional>
 #include <util/Index.h>
@@ -23,13 +23,7 @@
 #include "LogBufferDescriptor.h"
 #include "Header.h"
 
-namespace aeron {
-
-/** Concurrent operations and data structures */
-namespace concurrent {
-
-/** Logbuffer data structure */
-namespace logbuffer {
+namespace aeron { namespace concurrent { namespace logbuffer {
 
 /**
  * Callback for handling fragments of data being read from a log.
@@ -53,8 +47,7 @@ typedef std::function<void(
  *
  * @param exception that has occurred.
  */
-typedef std::function<void(
-    const std::exception& exception)> exception_handler_t;
+typedef std::function<void(const std::exception& exception)> exception_handler_t;
 
 namespace TermReader {
 

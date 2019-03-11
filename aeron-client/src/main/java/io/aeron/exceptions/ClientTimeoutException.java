@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.aeron;
+package io.aeron.exceptions;
 
 /**
- * Interface for delivery of End of Stream image notification to a {@link Subscription}.
+ * Client timeout event received from the driver for this client.
  */
-@FunctionalInterface
-public interface EndOfStreamHandler
+public class ClientTimeoutException extends TimeoutException
 {
-    /**
-     * Method called by Aeron to deliver notification that an {@link Image} has reached End of Stream.
-     *
-     * @param image that has reached End Of Stream.
-     */
-    void onEndOfStream(Image image);
+    public ClientTimeoutException(final String message)
+    {
+        super(message);
+    }
 }

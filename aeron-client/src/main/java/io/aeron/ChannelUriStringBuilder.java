@@ -1,5 +1,5 @@
 /*
- *  Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.aeron;
 
-import io.aeron.logbuffer.FrameDescriptor;
 import io.aeron.logbuffer.LogBufferDescriptor;
 
 import static io.aeron.ChannelUri.SPY_QUALIFIER;
@@ -42,8 +41,8 @@ public class ChannelUriStringBuilder
     private String controlEndpoint;
     private String controlMode;
     private String tags;
+    private String alias;
     private Boolean reliable;
-    private Boolean sparse;
     private Integer ttl;
     private Integer mtu;
     private Integer termLength;
@@ -51,7 +50,8 @@ public class ChannelUriStringBuilder
     private Integer termId;
     private Integer termOffset;
     private Integer sessionId;
-    private Integer linger;
+    private Long linger;
+    private Boolean sparse;
     private boolean isSessionIdTagged;
 
     /**
@@ -68,6 +68,7 @@ public class ChannelUriStringBuilder
         controlEndpoint = null;
         controlMode = null;
         tags = null;
+        alias = null;
         reliable = null;
         ttl = null;
         mtu = null;
@@ -76,6 +77,8 @@ public class ChannelUriStringBuilder
         termId = null;
         termOffset = null;
         sessionId = null;
+        linger = null;
+        sparse = null;
         isSessionIdTagged = false;
 
         return this;
@@ -104,10 +107,24 @@ public class ChannelUriStringBuilder
         count += null == termId ? 0 : 1;
         count += null == termOffset ? 0 : 1;
 
-        if (count > 0 && count < 3)
+        if (count > 0)
         {
-            throw new IllegalStateException(
-                "if any of then a complete set of 'initialTermId', 'termId', and 'termOffset' must be provided");
+            if (count < 3)
+            {
+                throw new IllegalStateException(
+                    "if any of then a complete set of 'initialTermId', 'termId', and 'termOffset' must be provided");
+            }
+
+            if (termId - initialTermId < 0) // lgtm [java/dereferenced-value-may-be-null]
+            {
+                throw new IllegalStateException(
+                    "difference greater than 2^31 - 1: termId=" + termId + " - initialTermId=" + initialTermId);
+            }
+
+            if (null != termLength && termOffset > termLength) // lgtm [java/dereferenced-value-may-be-null]
+            {
+                throw new IllegalStateException("termOffset=" + termOffset + " > termLength=" + termLength);
+            }
         }
 
         return this;
@@ -308,31 +325,6 @@ public class ChannelUriStringBuilder
     }
 
     /**
-     * Set to indicate if a term log buffer should be sparse on disk or not. Sparse saves space at the potential
-     * expense of latency.
-     *
-     * @param isSparse true if the term buffer log is sparse on disk.
-     * @return this for a fluent API.
-     * @see CommonContext#SPARSE_PARAM_NAME
-     */
-    public ChannelUriStringBuilder sparse(final Boolean isSparse)
-    {
-        this.sparse = isSparse;
-        return this;
-    }
-
-    /**
-     * Get if a term log buffer should be sparse on disk or not. Sparse saves space at the potential expense of latency.
-     *
-     * @return true if the term buffer log is sparse on disk.
-     * @see CommonContext#SPARSE_PARAM_NAME
-     */
-    public Boolean sparse()
-    {
-        return sparse;
-    }
-
-    /**
      * Set the Time To Live (TTL) for a multicast datagram. Valid values are 0-255 for the number of hops the datagram
      * can progress along.
      *
@@ -496,7 +488,7 @@ public class ChannelUriStringBuilder
                 throw new IllegalArgumentException("term offset not in range 0-1g: " + termOffset);
             }
 
-            if (0 != (termOffset & (FrameDescriptor.FRAME_ALIGNMENT - 1)))
+            if (0 != (termOffset & (FRAME_ALIGNMENT - 1)))
             {
                 throw new IllegalArgumentException("term offset not multiple of FRAME_ALIGNMENT: " + termOffset);
             }
@@ -542,14 +534,14 @@ public class ChannelUriStringBuilder
     }
 
     /**
-     * Set the time a publication will linger in nanoseconds after being drained. This time is so that tail loss
+     * Set the time a network publication will linger in nanoseconds after being drained. This time is so that tail loss
      * can be recovered.
      *
      * @param lingerNs time for the publication after it is drained.
      * @return this for a fluent API.
      * @see CommonContext#LINGER_PARAM_NAME
      */
-    public ChannelUriStringBuilder linger(final Integer lingerNs)
+    public ChannelUriStringBuilder linger(final Long lingerNs)
     {
         if (null != lingerNs && lingerNs < 0)
         {
@@ -561,15 +553,40 @@ public class ChannelUriStringBuilder
     }
 
     /**
-     * Get the time a publication will linger in nanoseconds after being drained. This time is so that tail loss
+     * Get the time a network publication will linger in nanoseconds after being drained. This time is so that tail loss
      * can be recovered.
      *
      * @return the linger time in nanoseconds a publication will wait around after being drained.
      * @see CommonContext#LINGER_PARAM_NAME
      */
-    public Integer linger()
+    public Long linger()
     {
         return linger;
+    }
+
+    /**
+     * Set to indicate if a term log buffer should be sparse on disk or not. Sparse saves space at the potential
+     * expense of latency.
+     *
+     * @param isSparse true if the term buffer log is sparse on disk.
+     * @return this for a fluent API.
+     * @see CommonContext#SPARSE_PARAM_NAME
+     */
+    public ChannelUriStringBuilder sparse(final Boolean isSparse)
+    {
+        this.sparse = isSparse;
+        return this;
+    }
+
+    /**
+     * Get if a term log buffer should be sparse on disk or not. Sparse saves space at the potential expense of latency.
+     *
+     * @return true if the term buffer log is sparse on disk.
+     * @see CommonContext#SPARSE_PARAM_NAME
+     */
+    public Boolean sparse()
+    {
+        return sparse;
     }
 
     /**
@@ -579,6 +596,7 @@ public class ChannelUriStringBuilder
      * @param tags for the channel, publication or subscription.
      * @return this for a fluent API.
      * @see CommonContext#TAGS_PARAM_NAME
+     * @see CommonContext#TAG_PREFIX
      */
     public ChannelUriStringBuilder tags(final String tags)
     {
@@ -592,6 +610,7 @@ public class ChannelUriStringBuilder
      *
      * @return the tags for a channel, publication or subscription.
      * @see CommonContext#TAGS_PARAM_NAME
+     * @see CommonContext#TAG_PREFIX
      */
     public String tags()
     {
@@ -603,6 +622,8 @@ public class ChannelUriStringBuilder
      *
      * @param isSessionIdTagged for session id
      * @return this for a fluent API.
+     * @see CommonContext#TAGS_PARAM_NAME
+     * @see CommonContext#TAG_PREFIX
      */
     public ChannelUriStringBuilder isSessionIdTagged(final boolean isSessionIdTagged)
     {
@@ -614,10 +635,36 @@ public class ChannelUriStringBuilder
      * Is the value for {@link #sessionId()} a tagged.
      *
      * @return whether the value for {@link #sessionId()} a tag reference or not.
+     * @see CommonContext#TAGS_PARAM_NAME
+     * @see CommonContext#TAG_PREFIX
      */
     public boolean isSessionIdTagged()
     {
         return isSessionIdTagged;
+    }
+
+    /**
+     * Set the alias for a URI. Alias's are not interpreted by Aeron and are to be used by the application
+     *
+     * @param alias for the URI.
+     * @return this for a fluent API.
+     * @see CommonContext#ALIAS_PARAM_NAME
+     */
+    public ChannelUriStringBuilder alias(final String alias)
+    {
+        this.alias = alias;
+        return this;
+    }
+
+    /**
+     * Get the alias present in the URI.
+     *
+     * @return alias for the URI.
+     * @see CommonContext#ALIAS_PARAM_NAME
+     */
+    public String alias()
+    {
+        return alias;
     }
 
     /**
@@ -630,6 +677,11 @@ public class ChannelUriStringBuilder
      */
     public ChannelUriStringBuilder initialPosition(final long position, final int initialTermId, final int termLength)
     {
+        if (position < 0 || 0 != (position & (FRAME_ALIGNMENT - 1)))
+        {
+            throw new IllegalArgumentException("invalid position: " + position);
+        }
+
         final int bitsToShift = LogBufferDescriptor.positionBitsToShift(termLength);
 
         this.initialTermId = initialTermId;
@@ -681,21 +733,6 @@ public class ChannelUriStringBuilder
             sb.append(MDC_CONTROL_MODE_PARAM_NAME).append('=').append(controlMode).append('|');
         }
 
-        if (null != reliable)
-        {
-            sb.append(RELIABLE_STREAM_PARAM_NAME).append('=').append(reliable).append('|');
-        }
-
-        if (null != sparse)
-        {
-            sb.append(SPARSE_PARAM_NAME).append('=').append(sparse).append('|');
-        }
-
-        if (null != ttl)
-        {
-            sb.append(TTL_PARAM_NAME).append('=').append(ttl.intValue()).append('|');
-        }
-
         if (null != mtu)
         {
             sb.append(MTU_LENGTH_PARAM_NAME).append('=').append(mtu.intValue()).append('|');
@@ -726,9 +763,29 @@ public class ChannelUriStringBuilder
             sb.append(SESSION_ID_PARAM_NAME).append('=').append(prefixTag(isSessionIdTagged, sessionId)).append('|');
         }
 
+        if (null != ttl)
+        {
+            sb.append(TTL_PARAM_NAME).append('=').append(ttl.intValue()).append('|');
+        }
+
+        if (null != reliable)
+        {
+            sb.append(RELIABLE_STREAM_PARAM_NAME).append('=').append(reliable).append('|');
+        }
+
         if (null != linger)
         {
             sb.append(LINGER_PARAM_NAME).append('=').append(linger.intValue()).append('|');
+        }
+
+        if (null != alias)
+        {
+            sb.append(ALIAS_PARAM_NAME).append('=').append(alias).append('|');
+        }
+
+        if (null != sparse)
+        {
+            sb.append(SPARSE_PARAM_NAME).append('=').append(sparse).append('|');
         }
 
         final char lastChar = sb.charAt(sb.length() - 1);
@@ -738,18 +795,6 @@ public class ChannelUriStringBuilder
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Call {@link Integer#valueOf(String)} only if the value param is not null. Else pass null on.
-     *
-     * @param value to check for null and convert if not null.
-     * @return null if value param is null or result of {@link Integer#valueOf(String)}.
-     * @see Integer#valueOf(String)
-     */
-    public static Integer integerValueOf(final String value)
-    {
-        return null == value ? null : Integer.valueOf(value);
     }
 
     private static String prefixTag(final boolean isTagged, final Integer value)

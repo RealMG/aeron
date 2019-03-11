@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.aeron.cluster.service;
 
 import io.aeron.Aeron;
+import io.aeron.DirectBufferVector;
 import io.aeron.Publication;
 import io.aeron.exceptions.RegistrationException;
 import org.agrona.CloseHelper;
@@ -131,16 +132,31 @@ public class ClientSession
         return cluster.offer(id, responsePublication, buffer, offset, length);
     }
 
+    /**
+     * Non-blocking publish by gathering buffer vectors into a message. The first vector will be replaced by the cluster
+     * egress header so must be left unused.
+     *
+     * @param vectors which make up the message.
+     * @return the same as {@link Publication#offer(DirectBufferVector[])}.
+     * @see Publication#offer(DirectBufferVector[]) when in {@link Cluster.Role#LEADER}
+     * otherwise {@link #MOCKED_OFFER}.
+     */
+    public long offer(final DirectBufferVector[] vectors)
+    {
+        return cluster.offer(id, responsePublication, vectors);
+    }
+
     void connect(final Aeron aeron)
     {
         if (null == responsePublication)
         {
             try
             {
-                responsePublication = aeron.addExclusivePublication(responseChannel, responseStreamId);
+                responsePublication = aeron.addPublication(responseChannel, responseStreamId);
             }
-            catch (final RegistrationException ignore)
+            catch (final RegistrationException ex)
             {
+                cluster.handleError(ex);
             }
         }
     }

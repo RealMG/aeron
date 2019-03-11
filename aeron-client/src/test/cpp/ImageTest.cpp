@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ using namespace aeron;
 using namespace std::placeholders;
 
 #define TERM_LENGTH (LogBufferDescriptor::TERM_MIN_LENGTH)
-#define PAGE_SIZE (LogBufferDescriptor::PAGE_MIN_SIZE)
+#define PAGE_SIZE (LogBufferDescriptor::AERON_PAGE_MIN_SIZE)
 #define LOG_META_DATA_LENGTH (LogBufferDescriptor::LOG_META_DATA_LENGTH)
 #define SRC_BUFFER_LENGTH 1024
 

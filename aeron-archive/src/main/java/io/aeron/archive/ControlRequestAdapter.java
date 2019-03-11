@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,11 @@
  */
 package io.aeron.archive;
 
+import io.aeron.archive.client.ArchiveException;
 import io.aeron.archive.codecs.*;
 import io.aeron.logbuffer.*;
 import org.agrona.DirectBuffer;
+import org.agrona.collections.ArrayUtil;
 
 class ControlRequestAdapter implements FragmentHandler
 {
@@ -43,6 +45,8 @@ class ControlRequestAdapter implements FragmentHandler
     private final StopPositionRequestDecoder stopPositionRequestDecoder = new StopPositionRequestDecoder();
     private final FindLastMatchingRecordingRequestDecoder findLastMatchingRecordingRequestDecoder =
         new FindLastMatchingRecordingRequestDecoder();
+    private final ListRecordingSubscriptionsRequestDecoder listRecordingSubscriptionsRequestDecoder =
+        new ListRecordingSubscriptionsRequestDecoder();
 
     ControlRequestAdapter(final ControlRequestListener listener)
     {
@@ -53,11 +57,18 @@ class ControlRequestAdapter implements FragmentHandler
     public void onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         headerDecoder.wrap(buffer, offset);
-        final int templateId = headerDecoder.templateId();
 
+        final int schemaId = headerDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ArchiveException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
+        final int templateId = headerDecoder.templateId();
         switch (templateId)
         {
             case ConnectRequestDecoder.TEMPLATE_ID:
+            {
                 connectRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -66,11 +77,14 @@ class ControlRequestAdapter implements FragmentHandler
 
                 listener.onConnect(
                     connectRequestDecoder.correlationId(),
-                    connectRequestDecoder.responseChannel(),
-                    connectRequestDecoder.responseStreamId());
+                    connectRequestDecoder.responseStreamId(),
+                    connectRequestDecoder.version(),
+                    connectRequestDecoder.responseChannel());
                 break;
+            }
 
             case CloseSessionRequestDecoder.TEMPLATE_ID:
+            {
                 closeSessionRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -79,8 +93,10 @@ class ControlRequestAdapter implements FragmentHandler
 
                 listener.onCloseSession(closeSessionRequestDecoder.controlSessionId());
                 break;
+            }
 
             case StartRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 startRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -94,8 +110,10 @@ class ControlRequestAdapter implements FragmentHandler
                     startRecordingRequestDecoder.channel(),
                     startRecordingRequestDecoder.sourceLocation());
                 break;
+            }
 
             case StopRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 stopRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -108,8 +126,10 @@ class ControlRequestAdapter implements FragmentHandler
                     stopRecordingRequestDecoder.streamId(),
                     stopRecordingRequestDecoder.channel());
                 break;
+            }
 
             case ReplayRequestDecoder.TEMPLATE_ID:
+            {
                 replayRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -125,8 +145,10 @@ class ControlRequestAdapter implements FragmentHandler
                     replayRequestDecoder.replayStreamId(),
                     replayRequestDecoder.replayChannel());
                 break;
+            }
 
             case StopReplayRequestDecoder.TEMPLATE_ID:
+            {
                 stopReplayRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -138,8 +160,10 @@ class ControlRequestAdapter implements FragmentHandler
                     stopReplayRequestDecoder.correlationId(),
                     stopReplayRequestDecoder.replaySessionId());
                 break;
+            }
 
             case ListRecordingsRequestDecoder.TEMPLATE_ID:
+            {
                 listRecordingsRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -152,13 +176,19 @@ class ControlRequestAdapter implements FragmentHandler
                     listRecordingsRequestDecoder.fromRecordingId(),
                     listRecordingsRequestDecoder.recordCount());
                 break;
+            }
 
             case ListRecordingsForUriRequestDecoder.TEMPLATE_ID:
+            {
                 listRecordingsForUriRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
                     headerDecoder.blockLength(),
                     headerDecoder.version());
+
+                final int channelLength = listRecordingsForUriRequestDecoder.channelLength();
+                final byte[] bytes = 0 == channelLength ? ArrayUtil.EMPTY_BYTE_ARRAY : new byte[channelLength];
+                listRecordingsForUriRequestDecoder.getChannel(bytes, 0, channelLength);
 
                 listener.onListRecordingsForUri(
                     listRecordingsForUriRequestDecoder.controlSessionId(),
@@ -166,10 +196,12 @@ class ControlRequestAdapter implements FragmentHandler
                     listRecordingsForUriRequestDecoder.fromRecordingId(),
                     listRecordingsForUriRequestDecoder.recordCount(),
                     listRecordingsForUriRequestDecoder.streamId(),
-                    listRecordingsForUriRequestDecoder.channel());
+                    bytes);
                 break;
+            }
 
             case ListRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 listRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -181,8 +213,10 @@ class ControlRequestAdapter implements FragmentHandler
                     listRecordingRequestDecoder.correlationId(),
                     listRecordingRequestDecoder.recordingId());
                 break;
+            }
 
             case ExtendRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 extendRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -197,8 +231,10 @@ class ControlRequestAdapter implements FragmentHandler
                     extendRecordingRequestDecoder.channel(),
                     extendRecordingRequestDecoder.sourceLocation());
                 break;
+            }
 
             case RecordingPositionRequestDecoder.TEMPLATE_ID:
+            {
                 recordingPositionRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -210,8 +246,10 @@ class ControlRequestAdapter implements FragmentHandler
                     recordingPositionRequestDecoder.correlationId(),
                     recordingPositionRequestDecoder.recordingId());
                 break;
+            }
 
             case TruncateRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 truncateRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -224,8 +262,10 @@ class ControlRequestAdapter implements FragmentHandler
                     truncateRecordingRequestDecoder.recordingId(),
                     truncateRecordingRequestDecoder.position());
                 break;
+            }
 
             case StopRecordingSubscriptionRequestDecoder.TEMPLATE_ID:
+            {
                 stopRecordingSubscriptionRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -237,8 +277,10 @@ class ControlRequestAdapter implements FragmentHandler
                     stopRecordingSubscriptionRequestDecoder.correlationId(),
                     stopRecordingSubscriptionRequestDecoder.subscriptionId());
                 break;
+            }
 
             case StopPositionRequestDecoder.TEMPLATE_ID:
+            {
                 stopPositionRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
@@ -250,13 +292,19 @@ class ControlRequestAdapter implements FragmentHandler
                     stopPositionRequestDecoder.correlationId(),
                     stopPositionRequestDecoder.recordingId());
                 break;
+            }
 
             case FindLastMatchingRecordingRequestDecoder.TEMPLATE_ID:
+            {
                 findLastMatchingRecordingRequestDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
                     headerDecoder.blockLength(),
                     headerDecoder.version());
+
+                final int channelLength = findLastMatchingRecordingRequestDecoder.channelLength();
+                final byte[] bytes = 0 == channelLength ? ArrayUtil.EMPTY_BYTE_ARRAY : new byte[channelLength];
+                findLastMatchingRecordingRequestDecoder.getChannel(bytes, 0, channelLength);
 
                 listener.onFindLastMatchingRecording(
                     findLastMatchingRecordingRequestDecoder.controlSessionId(),
@@ -264,11 +312,27 @@ class ControlRequestAdapter implements FragmentHandler
                     findLastMatchingRecordingRequestDecoder.minRecordingId(),
                     findLastMatchingRecordingRequestDecoder.sessionId(),
                     findLastMatchingRecordingRequestDecoder.streamId(),
-                    findLastMatchingRecordingRequestDecoder.channel());
+                    bytes);
                 break;
+            }
 
-            default:
-                throw new IllegalArgumentException("unexpected template id:" + templateId);
+            case ListRecordingSubscriptionsRequestDecoder.TEMPLATE_ID:
+            {
+                listRecordingSubscriptionsRequestDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    headerDecoder.blockLength(),
+                    headerDecoder.version());
+
+                listener.onListRecordingSubscriptions(
+                    listRecordingSubscriptionsRequestDecoder.controlSessionId(),
+                    listRecordingSubscriptionsRequestDecoder.correlationId(),
+                    listRecordingSubscriptionsRequestDecoder.pseudoIndex(),
+                    listRecordingSubscriptionsRequestDecoder.subscriptionCount(),
+                    listRecordingSubscriptionsRequestDecoder.applyStreamId() == BooleanType.TRUE,
+                    listRecordingSubscriptionsRequestDecoder.streamId(),
+                    listRecordingSubscriptionsRequestDecoder.channel());
+            }
         }
     }
 }

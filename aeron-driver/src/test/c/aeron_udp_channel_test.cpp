@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 #include <functional>
 
 #include <gtest/gtest.h>
-#include <arpa/inet.h>
 
 extern "C"
 {
@@ -83,7 +82,7 @@ public:
             aeron_udp_channel_delete(m_channel);
         }
 
-        return aeron_udp_channel_parse(uri, strlen(uri) - 1, &m_channel);
+        return aeron_udp_channel_parse(strlen(uri), uri, &m_channel);
     }
 
 protected:

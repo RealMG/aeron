@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_UDP_TRANSPORT_POLLER_H
-#define AERON_AERON_UDP_TRANSPORT_POLLER_H
+#ifndef AERON_UDP_TRANSPORT_POLLER_H
+#define AERON_UDP_TRANSPORT_POLLER_H
 
 #if defined(HAVE_EPOLL)
 #include <sys/epoll.h>
@@ -65,4 +65,4 @@ int aeron_udp_transport_poller_poll(
     aeron_udp_transport_recv_func_t recv_func,
     void *clientd);
 
-#endif //AERON_AERON_UDP_TRANSPORT_POLLER_H
+#endif //AERON_UDP_TRANSPORT_POLLER_H

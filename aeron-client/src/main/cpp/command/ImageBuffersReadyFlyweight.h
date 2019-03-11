@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef INCLUDED_AERON_COMMAND_CONNECTIONREADYFLYWEIGHT__
-#define INCLUDED_AERON_COMMAND_CONNECTIONREADYFLYWEIGHT__
+#ifndef AERON_COMMAND_CONNECTION_READY_FLYWEIGHT_H
+#define AERON_COMMAND_CONNECTION_READY_FLYWEIGHT_H
 
 #include <cstdint>
 #include <stddef.h>
@@ -42,7 +42,7 @@ namespace aeron { namespace command {
 * +---------------------------------------------------------------+
 * |                         Stream ID                             |
 * +---------------------------------------------------------------+
-* |                  Subscriber Registration Id                   |
+* |                 Subscription Registration Id                  |
 * |                                                               |
 * +---------------------------------------------------------------+
 * |                    Subscriber Position Id                     |
@@ -66,7 +66,7 @@ struct ImageBuffersReadyDefn
     std::int64_t correlationId;
     std::int32_t sessionId;
     std::int32_t streamId;
-    std::int64_t subscriberRegistrationId;
+    std::int64_t subscriptionRegistrationId;
     std::int32_t subscriberPositionId;
 };
 #pragma pack(pop)
@@ -76,8 +76,8 @@ class ImageBuffersReadyFlyweight : public Flyweight<ImageBuffersReadyDefn>
 public:
     typedef ImageBuffersReadyFlyweight this_t;
 
-    inline ImageBuffersReadyFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset)
-        : Flyweight<ImageBuffersReadyDefn>(buffer, offset)
+    inline ImageBuffersReadyFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset) :
+        Flyweight<ImageBuffersReadyDefn>(buffer, offset)
     {
     }
 
@@ -114,14 +114,14 @@ public:
         return *this;
     }
 
-    inline std::int64_t subscriberRegistrationId() const
+    inline std::int64_t subscriptionRegistrationId() const
     {
-        return m_struct.subscriberRegistrationId;
+        return m_struct.subscriptionRegistrationId;
     }
 
     inline this_t& subscriberRegistrationId(std::int64_t value)
     {
-        m_struct.subscriberRegistrationId = value;
+        m_struct.subscriptionRegistrationId = value;
         return *this;
     }
 

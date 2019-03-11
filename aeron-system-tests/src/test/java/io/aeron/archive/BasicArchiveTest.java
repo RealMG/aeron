@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import io.aeron.driver.ThreadingMode;
 import io.aeron.logbuffer.FragmentHandler;
 import org.agrona.CloseHelper;
 import org.agrona.ExpandableArrayBuffer;
-import org.agrona.IoUtil;
+import org.agrona.SystemUtil;
 import org.agrona.collections.MutableInteger;
 import org.agrona.concurrent.status.CountersReader;
 import org.junit.After;
@@ -79,7 +79,7 @@ public class BasicArchiveTest
                 .maxCatalogEntries(MAX_CATALOG_ENTRIES)
                 .aeronDirectoryName(aeronDirectoryName)
                 .deleteArchiveOnStart(true)
-                .archiveDir(new File(IoUtil.tmpDirName(), "archive"))
+                .archiveDir(new File(SystemUtil.tmpDirName(), "archive"))
                 .fileSyncLevel(0)
                 .threadingMode(ArchiveThreadingMode.SHARED));
 
@@ -126,7 +126,7 @@ public class BasicArchiveTest
     }
 
     @Test(timeout = 10_000)
-    public void shouldRecordAndReplay()
+    public void shouldRecordThenReplayThenTruncate()
     {
         final String messagePrefix = "Message-Prefix-";
         final int messageCount = 10;
@@ -181,6 +181,27 @@ public class BasicArchiveTest
         }
 
         aeronArchive.truncateRecording(recordingId, position);
+
+        final int count = aeronArchive.listRecording(
+            recordingId,
+            (controlSessionId,
+            correlationId,
+            recordingId1,
+            startTimestamp,
+            stopTimestamp,
+            startPosition,
+            newStopPosition,
+            initialTermId,
+            segmentFileLength,
+            termBufferLength,
+            mtuLength,
+            sessionId1,
+            streamId,
+            strippedChannel,
+            originalChannel,
+            sourceIdentity) -> assertEquals(startPosition, newStopPosition));
+
+        assertEquals(1, count);
     }
 
     @Test(timeout = 10_000)

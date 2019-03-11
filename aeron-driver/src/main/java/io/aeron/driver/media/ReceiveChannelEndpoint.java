@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,13 +68,7 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
         final AtomicCounter statusIndicator,
         final MediaDriver.Context context)
     {
-        super(
-            udpChannel,
-            udpChannel.remoteData(),
-            udpChannel.remoteData(),
-            null,
-            context.errorLog(),
-            context.systemCounters().get(INVALID_PACKETS));
+        super(udpChannel, udpChannel.remoteData(), udpChannel.remoteData(), null, context);
 
         this.dispatcher = dispatcher;
         this.statusIndicator = statusIndicator;
@@ -431,12 +425,12 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
     }
 
     public void sendStatusMessage(
-        final DestinationImageControlAddress[] controlAddresses,
+        final ImageConnection[] controlAddresses,
         final int sessionId,
         final int streamId,
         final int termId,
         final int termOffset,
-        final int window,
+        final int windowLength,
         final short flags)
     {
         if (!isClosed)
@@ -447,7 +441,7 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
                 .streamId(streamId)
                 .consumptionTermId(termId)
                 .consumptionTermOffset(termOffset)
-                .receiverWindowLength(window)
+                .receiverWindowLength(windowLength)
                 .flags(flags);
 
             send(smBuffer, StatusMessageFlyweight.HEADER_LENGTH, controlAddresses);
@@ -455,7 +449,7 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
     }
 
     public void sendNakMessage(
-        final DestinationImageControlAddress[] controlAddresses,
+        final ImageConnection[] controlAddresses,
         final int sessionId,
         final int streamId,
         final int termId,
@@ -477,7 +471,7 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
     }
 
     public void sendRttMeasurement(
-        final DestinationImageControlAddress[] controlAddresses,
+        final ImageConnection[] controlAddresses,
         final int sessionId,
         final int streamId,
         final long echoTimestampNs,
@@ -543,18 +537,17 @@ public class ReceiveChannelEndpoint extends UdpChannelTransport
         return dispatcher.shouldElicitSetupMessage();
     }
 
-    protected void send(
-        final ByteBuffer buffer, final int bytesToSend, final DestinationImageControlAddress[] controlAddresses)
+    protected void send(final ByteBuffer buffer, final int bytesToSend, final ImageConnection[] imageConnections)
     {
         final int bytesSent;
 
         if (null == multiRcvDestination)
         {
-            bytesSent = sendTo(buffer, controlAddresses[0].address);
+            bytesSent = sendTo(buffer, imageConnections[0].controlAddress);
         }
         else
         {
-            bytesSent = multiRcvDestination.sendToAll(controlAddresses, buffer, 0, bytesToSend);
+            bytesSent = multiRcvDestination.sendToAll(imageConnections, buffer, 0, bytesToSend);
         }
 
         if (bytesToSend != bytesSent)

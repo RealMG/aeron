@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,14 +37,19 @@ class DriverEventsAdapter implements MessageHandler
     private final OperationSucceededFlyweight operationSucceeded = new OperationSucceededFlyweight();
     private final ImageMessageFlyweight imageMessage = new ImageMessageFlyweight();
     private final CounterUpdateFlyweight counterUpdate = new CounterUpdateFlyweight();
+    private final ClientTimeoutFlyweight clientTimeout = new ClientTimeoutFlyweight();
     private final DriverEventsListener listener;
+    private final long clientId;
 
     private long activeCorrelationId;
     private long receivedCorrelationId;
+    private boolean isInvalid;
 
-    DriverEventsAdapter(final CopyBroadcastReceiver broadcastReceiver, final DriverEventsListener listener)
+    DriverEventsAdapter(
+        final CopyBroadcastReceiver broadcastReceiver, final long clientId, final DriverEventsListener listener)
     {
         this.broadcastReceiver = broadcastReceiver;
+        this.clientId = clientId;
         this.listener = listener;
     }
 
@@ -53,12 +58,30 @@ class DriverEventsAdapter implements MessageHandler
         this.activeCorrelationId = activeCorrelationId;
         this.receivedCorrelationId = Aeron.NULL_VALUE;
 
-        return broadcastReceiver.receive(this);
+        try
+        {
+            return broadcastReceiver.receive(this);
+        }
+        catch (final IllegalStateException ex)
+        {
+            isInvalid = true;
+            throw ex;
+        }
     }
 
     public long receivedCorrelationId()
     {
         return receivedCorrelationId;
+    }
+
+    public boolean isInvalid()
+    {
+        return isInvalid;
+    }
+
+    public long clientId()
+    {
+        return clientId;
     }
 
     @SuppressWarnings("MethodLength")
@@ -93,7 +116,6 @@ class DriverEventsAdapter implements MessageHandler
 
                 listener.onAvailableImage(
                     imageReady.correlationId(),
-                    imageReady.streamId(),
                     imageReady.sessionId(),
                     imageReady.subscriptionRegistrationId(),
                     imageReady.subscriberPositionId(),
@@ -152,7 +174,8 @@ class DriverEventsAdapter implements MessageHandler
                 imageMessage.wrap(buffer, index);
 
                 listener.onUnavailableImage(
-                    imageMessage.correlationId(), imageMessage.subscriptionRegistrationId(), imageMessage.streamId());
+                    imageMessage.correlationId(),
+                    imageMessage.subscriptionRegistrationId());
                 break;
             }
 
@@ -199,6 +222,17 @@ class DriverEventsAdapter implements MessageHandler
                 counterUpdate.wrap(buffer, index);
 
                 listener.onUnavailableCounter(counterUpdate.correlationId(), counterUpdate.counterId());
+                break;
+            }
+
+            case ON_CLIENT_TIMEOUT:
+            {
+                clientTimeout.wrap(buffer, index);
+
+                if (clientTimeout.clientId() == clientId)
+                {
+                    listener.onClientTimeout();
+                }
                 break;
             }
         }

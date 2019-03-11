@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.aeron.driver;
 
 import io.aeron.driver.media.*;
+import org.agrona.collections.MutableInteger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,7 +31,6 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
@@ -79,8 +79,10 @@ public class SelectorAndTransportTest
         when(mockPublication.streamId()).thenReturn(STREAM_ID);
         when(mockPublication.sessionId()).thenReturn(SESSION_ID);
 
-        context.systemCounters(mockSystemCounters);
-        context.receiveChannelEndpointThreadLocals(new ReceiveChannelEndpointThreadLocals(context));
+        context
+            .applicationSpecificFeedback(Configuration.applicationSpecificFeedback())
+            .systemCounters(mockSystemCounters)
+            .receiveChannelEndpointThreadLocals(new ReceiveChannelEndpointThreadLocals(context));
     }
 
     @After
@@ -100,11 +102,8 @@ public class SelectorAndTransportTest
                 processLoop(dataTransportPoller, 5);
             }
 
-            if (null != dataTransportPoller)
-            {
-                dataTransportPoller.close();
-                controlTransportPoller.close();
-            }
+            dataTransportPoller.close();
+            controlTransportPoller.close();
         }
         catch (final Exception ex)
         {
@@ -130,12 +129,12 @@ public class SelectorAndTransportTest
     @Test(timeout = 1000)
     public void shouldSendEmptyDataFrameUnicastFromSourceToReceiver()
     {
-        final AtomicInteger dataHeadersReceived = new AtomicInteger(0);
+        final MutableInteger dataHeadersReceived = new MutableInteger(0);
 
         doAnswer(
             (invocation) ->
             {
-                dataHeadersReceived.incrementAndGet();
+                dataHeadersReceived.value++;
                 return null;
             })
             .when(mockDispatcher).onDataPacket(
@@ -180,12 +179,12 @@ public class SelectorAndTransportTest
     @Test(timeout = 1000)
     public void shouldSendMultipleDataFramesPerDatagramUnicastFromSourceToReceiver()
     {
-        final AtomicInteger dataHeadersReceived = new AtomicInteger(0);
+        final MutableInteger dataHeadersReceived = new MutableInteger(0);
 
         doAnswer(
             (invocation) ->
             {
-                dataHeadersReceived.incrementAndGet();
+                dataHeadersReceived.value++;
                 return null;
             })
             .when(mockDispatcher).onDataPacket(
@@ -243,12 +242,12 @@ public class SelectorAndTransportTest
     @Test(timeout = 1000)
     public void shouldHandleSmFrameFromReceiverToSender()
     {
-        final AtomicInteger controlMessagesReceived = new AtomicInteger(0);
+        final MutableInteger controlMessagesReceived = new MutableInteger(0);
 
         doAnswer(
             (invocation) ->
             {
-                controlMessagesReceived.incrementAndGet();
+                controlMessagesReceived.value++;
                 return null;
             })
             .when(mockPublication).onStatusMessage(any(), any());

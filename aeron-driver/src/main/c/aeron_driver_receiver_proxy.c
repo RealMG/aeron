@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <sched.h>
 #include "concurrent/aeron_counters_manager.h"
 #include "aeron_driver_receiver_proxy.h"
 #include "aeron_driver_receiver.h"
@@ -112,8 +111,7 @@ void aeron_driver_receiver_proxy_on_add_subscription(
     {
         aeron_command_subscription_t cmd =
             {
-                .base.func = aeron_driver_receiver_on_add_subscription,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_receiver_on_add_subscription, .item = NULL },
                 .endpoint = endpoint,
                 .stream_id = stream_id
             };
@@ -146,8 +144,7 @@ void aeron_driver_receiver_proxy_on_remove_subscription(
     {
         aeron_command_subscription_t cmd =
             {
-                .base.func = aeron_driver_receiver_on_remove_subscription,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_receiver_on_remove_subscription, .item = NULL },
                 .endpoint = endpoint,
                 .stream_id = stream_id
             };
@@ -182,8 +179,7 @@ void aeron_driver_receiver_proxy_on_add_publication_image(
     {
         aeron_command_publication_image_t cmd =
             {
-                .base.func = aeron_driver_receiver_on_add_publication_image,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_receiver_on_add_publication_image, .item = NULL },
                 .endpoint = endpoint,
                 .image = image
             };
@@ -218,8 +214,7 @@ void aeron_driver_receiver_proxy_on_remove_publication_image(
     {
         aeron_command_publication_image_t cmd =
             {
-                .base.func = aeron_driver_receiver_on_remove_publication_image,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_receiver_on_remove_publication_image, .item = NULL },
                 .endpoint = endpoint,
                 .image = image
             };
@@ -255,8 +250,7 @@ void aeron_driver_receiver_proxy_on_remove_cool_down(
     {
         aeron_command_remove_cool_down_t cmd =
             {
-                .base.func = aeron_driver_receiver_on_remove_cool_down,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_receiver_on_remove_cool_down, .item = NULL },
                 .endpoint = endpoint,
                 .session_id = session_id,
                 .stream_id = stream_id

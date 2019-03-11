@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <inttypes.h>
 #include "uri/aeron_uri.h"
 #include "util/aeron_arrayutil.h"
+#include "util/aeron_parse_util.h"
 #include "aeron_driver_context.h"
 #include "aeron_uri.h"
 #include "aeron_alloc.h"
@@ -201,11 +202,15 @@ int aeron_ipc_uri_parse(char *uri, aeron_ipc_channel_params_t *params)
 #define AERON_URI_UDP_TRANSPORT "udp"
 #define AERON_URI_IPC_TRANSPORT "ipc"
 
-int aeron_uri_parse(const char *uri, aeron_uri_t *params)
+int aeron_uri_parse(size_t uri_length, const char *uri, aeron_uri_t *params)
 {
-    char *ptr = params->mutable_uri;
+    size_t copy_length = sizeof(params->mutable_uri) - 1;
+    copy_length = uri_length < copy_length ? uri_length : copy_length;
 
-    strncpy(params->mutable_uri, uri, sizeof(params->mutable_uri));
+    memcpy(params->mutable_uri, uri, copy_length);
+    params->mutable_uri[copy_length] = '\0';
+
+    char *ptr = params->mutable_uri;
     params->type = AERON_URI_UNKNOWN;
 
     if (strncmp(ptr, AERON_URI_SCHEME, strlen(AERON_URI_SCHEME)) == 0)
@@ -237,6 +242,7 @@ int aeron_uri_parse(const char *uri, aeron_uri_t *params)
     }
 
     aeron_set_err(EINVAL, "invalid URI scheme or transport: %s", uri);
+
     return -1;
 }
 
@@ -247,8 +253,7 @@ uint8_t aeron_uri_multicast_ttl(aeron_uri_t *uri)
     if (AERON_URI_UDP == uri->type && NULL != uri->params.udp.ttl_key)
     {
         uint64_t value = strtoull(uri->params.udp.ttl_key, NULL, 0);
-
-        result = (value > 255u) ? (uint8_t)255 : (uint8_t)value;
+        result = value > 255u ? (uint8_t)255 : (uint8_t)value;
     }
 
     return result;
@@ -277,9 +282,9 @@ int aeron_uri_get_term_length_param(aeron_uri_params_t *uri_params, aeron_uri_pu
 
     if ((value_str = aeron_uri_find_param_value(uri_params, AERON_URI_TERM_LENGTH_KEY)) != NULL)
     {
-        uint64_t value = strtoull(value_str, NULL, 0);
+        uint64_t value;
 
-        if (0 == value && EINVAL == errno)
+        if (-1 == aeron_parse_size64(value_str, &value))
         {
             aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_TERM_LENGTH_KEY);
             return -1;
@@ -302,9 +307,9 @@ int aeron_uri_get_mtu_length_param(aeron_uri_params_t *uri_params, aeron_uri_pub
 
     if ((value_str = aeron_uri_find_param_value(uri_params, AERON_URI_MTU_LENGTH_KEY)) != NULL)
     {
-        uint64_t value = strtoull(value_str, NULL, 0);
+        uint64_t value;
 
-        if (0 == value && EINVAL == errno)
+        if (-1 == aeron_parse_size64(value_str, &value))
         {
             aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_MTU_LENGTH_KEY);
             return -1;
@@ -321,20 +326,47 @@ int aeron_uri_get_mtu_length_param(aeron_uri_params_t *uri_params, aeron_uri_pub
     return 0;
 }
 
+int aeron_uri_linger_timeout_param(aeron_uri_params_t *uri_params, aeron_uri_publication_params_t *params)
+{
+    const char *value_str;
+
+    if ((value_str = aeron_uri_find_param_value(uri_params, AERON_URI_LINGER_TIMEOUT_KEY)) != NULL)
+    {
+        uint64_t value;
+
+        if (-1 == aeron_parse_duration_ns(value_str, &value))
+        {
+            aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_LINGER_TIMEOUT_KEY);
+            return -1;
+        }
+
+        params->linger_timeout_ns = value;
+    }
+
+    return 0;
+}
+
 int aeron_uri_publication_params(
     aeron_uri_t *uri,
     aeron_uri_publication_params_t *params,
     aeron_driver_context_t *context,
     bool is_exclusive)
 {
+    params->linger_timeout_ns = context->publication_linger_timeout_ns;
     params->term_length = AERON_URI_IPC == uri->type ? context->ipc_term_buffer_length : context->term_buffer_length;
     params->mtu_length = AERON_URI_IPC == uri->type ? context->ipc_mtu_length : context->mtu_length;
     params->initial_term_id = 0;
     params->term_offset = 0;
     params->term_id = 0;
     params->is_replay = false;
-    aeron_uri_params_t *uri_params =
-        (AERON_URI_IPC == uri->type) ? &uri->params.ipc.additional_params : &uri->params.udp.additional_params;
+    params->is_sparse = context->term_buffer_sparse_file;
+    aeron_uri_params_t *uri_params = AERON_URI_IPC == uri->type ?
+        &uri->params.ipc.additional_params : &uri->params.udp.additional_params;
+
+    if (aeron_uri_linger_timeout_param(uri_params, params) < 0)
+    {
+        return -1;
+    }
 
     if (aeron_uri_get_term_length_param(uri_params, params) < 0)
     {
@@ -366,24 +398,27 @@ int aeron_uri_publication_params(
         {
             if (count < 3)
             {
-                aeron_set_err(EINVAL, "Params must be used as a complete set: %s %s %s",
+                aeron_set_err(EINVAL, "params must be used as a complete set: %s %s %s",
                     AERON_URI_INITIAL_TERM_ID_KEY, AERON_URI_TERM_ID_KEY, AERON_URI_TERM_OFFSET_KEY);
                 return -1;
             }
 
-            if ((params->initial_term_id = strtoll(initial_term_id_str, NULL, 0)) == 0 && EINVAL == errno)
+            errno = 0;
+            if ((params->initial_term_id = strtoll(initial_term_id_str, NULL, 0)) == 0 && 0 != errno)
             {
                 aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_INITIAL_TERM_ID_KEY);
                 return -1;
             }
 
-            if ((params->term_id = strtoll(term_id_str, NULL, 0)) == 0 && EINVAL == errno)
+            errno = 0;
+            if ((params->term_id = strtoll(term_id_str, NULL, 0)) == 0 && 0 != errno)
             {
                 aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_TERM_ID_KEY);
                 return -1;
             }
 
-            if ((params->term_offset = strtoull(term_offset_str, NULL, 0)) == 0 && EINVAL == errno)
+            errno = 0;
+            if ((params->term_offset = strtoull(term_offset_str, NULL, 0)) == 0 && 0 != errno)
             {
                 aeron_set_err(EINVAL, "could not parse %s in URI", AERON_URI_TERM_OFFSET_KEY);
                 return -1;
@@ -399,9 +434,19 @@ int aeron_uri_publication_params(
 
             if (params->term_id < INT32_MIN || params->term_id > INT32_MAX)
             {
+                aeron_set_err(EINVAL, "Params %s=%" PRId64 " out of range", AERON_URI_TERM_ID_KEY, params->term_id);
+                return -1;
+            }
+
+            if (((int32_t)params->term_id - (int32_t)params->initial_term_id) < 0)
+            {
                 aeron_set_err(
                     EINVAL,
-                    "Params %s=%" PRId64 " out of range", AERON_URI_TERM_ID_KEY, params->term_id);
+                    "Param difference greater than 2^31 - 1: %s=%" PRId64 " %s=%" PRId64,
+                    AERON_URI_INITIAL_TERM_ID_KEY,
+                    params->initial_term_id,
+                    AERON_URI_TERM_OFFSET_KEY,
+                    params->term_id);
                 return -1;
             }
 
@@ -431,27 +476,44 @@ int aeron_uri_publication_params(
         }
     }
 
+    const char *value_str;
+
+    if ((value_str = aeron_uri_find_param_value(uri_params, AERON_URI_SPARSE_TERM_KEY)) != NULL)
+    {
+        if (strncmp("true", value_str, strlen("true")) == 0)
+        {
+            params->is_sparse = true;
+        }
+    }
+
     return 0;
 }
 
-int aeron_udp_channel_subscription_params(
+int aeron_uri_subscription_params(
     aeron_uri_t *uri,
-    aeron_udp_channel_subscription_params_t *params,
+    aeron_uri_subscription_params_t *params,
     aeron_driver_context_t *context)
 {
-    params->reliable = true;
+    params->is_reliable = true;
+    params->is_sparse = context->term_buffer_sparse_file;
 
     const char *value_str;
+    aeron_uri_params_t *uri_params = AERON_URI_IPC == uri->type ?
+        &uri->params.ipc.additional_params : &uri->params.udp.additional_params;
 
-    if (AERON_URI_UDP == uri->type)
+    if ((value_str = aeron_uri_find_param_value(uri_params, AERON_UDP_CHANNEL_RELIABLE_KEY)) != NULL)
     {
-        if ((value_str = aeron_uri_find_param_value(
-            &uri->params.udp.additional_params, AERON_UDP_CHANNEL_RELIABLE_STREAM_KEY)) != NULL)
+        if (strncmp("false", value_str, strlen("false")) == 0)
         {
-            if (strncmp("false", value_str, strlen("false")) == 0)
-            {
-                params->reliable = false;
-            }
+            params->is_reliable = false;
+        }
+    }
+
+    if ((value_str = aeron_uri_find_param_value(uri_params, AERON_URI_SPARSE_TERM_KEY)) != NULL)
+    {
+        if (strncmp("true", value_str, strlen("true")) == 0)
+        {
+            params->is_sparse = true;
         }
     }
 

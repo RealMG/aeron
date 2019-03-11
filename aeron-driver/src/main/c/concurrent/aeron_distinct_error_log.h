@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_DISTINCT_ERROR_LOG_H
-#define AERON_AERON_DISTINCT_ERROR_LOG_H
+#ifndef AERON_DISTINCT_ERROR_LOG_H
+#define AERON_DISTINCT_ERROR_LOG_H
 
 #include <stdint.h>
 #include <stddef.h>
-#include <pthread.h>
 #include <stdbool.h>
 #include <aeron_alloc.h>
 #include "aeronmd.h"
 #include "util/aeron_bitutil.h"
+#include "concurrent/aeron_thread.h"
 #include "concurrent/aeron_atomic.h"
 
 #pragma pack(push)
@@ -68,7 +68,7 @@ typedef struct aeron_distinct_error_log_stct
     aeron_clock_func_t clock;
     aeron_resource_linger_func_t linger_resource;
     void *linger_resource_clientd;
-    pthread_mutex_t mutex;
+    AERON_MUTEX mutex;
 }
 aeron_distinct_error_log_t;
 
@@ -137,4 +137,4 @@ inline void aeron_distinct_error_log_observation_list_store(
     AERON_PUT_ORDERED(log->observation_list, list);
 }
 
-#endif //AERON_AERON_DISTINCT_ERROR_LOG_H
+#endif //AERON_DISTINCT_ERROR_LOG_H

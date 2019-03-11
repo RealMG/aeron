@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,6 +87,26 @@ public class ExclusivePublication extends Publication
         termId = termId(rawTail);
         termOffset = termOffset(rawTail);
         termBeginPosition = computeTermBeginPosition(termId, positionBitsToShift, initialTermId);
+    }
+
+    public long position()
+    {
+        if (isClosed)
+        {
+            return CLOSED;
+        }
+
+        return termBeginPosition + termOffset;
+    }
+
+    public long availableWindow()
+    {
+        if (isClosed)
+        {
+            return CLOSED;
+        }
+
+        return positionLimit.getVolatile() - (termBeginPosition + termOffset);
     }
 
     /**
@@ -379,7 +399,7 @@ public class ExclusivePublication extends Publication
         activePartitionIndex = nextIndex;
         termOffset = 0;
         termId = nextTermId;
-        termBeginPosition = computeTermBeginPosition(nextTermId, positionBitsToShift, initialTermId);
+        termBeginPosition += termBufferLength;
 
         final int termCount = nextTermId - initialTermId;
 

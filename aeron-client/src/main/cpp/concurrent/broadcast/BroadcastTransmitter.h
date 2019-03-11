@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_BROADCAST_TRANSMITTER__
-#define INCLUDED_AERON_CONCURRENT_BROADCAST_TRANSMITTER__
+#ifndef AERON_CONCURRENT_BROADCAST_TRANSMITTER_H
+#define AERON_CONCURRENT_BROADCAST_TRANSMITTER_H
 
 #include <util/Index.h>
 #include <concurrent/AtomicBuffer.h>
@@ -49,7 +49,8 @@ public:
         return m_maxMsgLength;
     }
 
-    void transmit(std::int32_t msgTypeId, concurrent::AtomicBuffer& srcBuffer, util::index_t srcIndex, util::index_t length)
+    void transmit(
+        std::int32_t msgTypeId, concurrent::AtomicBuffer& srcBuffer, util::index_t srcIndex, util::index_t length)
     {
         RecordDescriptor::checkMsgTypeId(msgTypeId);
         checkMessageLength(length);
@@ -98,14 +99,14 @@ private:
         if (length > m_maxMsgLength)
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("encoded message exceeds maxMsgLength of %d, length=%d", m_maxMsgLength, length), SOURCEINFO);
+                "encoded message exceeds maxMsgLength of " + std::to_string(m_maxMsgLength) +
+                ", length=" + std::to_string(length), SOURCEINFO);
         }
     }
 
     inline void signalTailIntent(AtomicBuffer& buffer, std::int64_t newTail)
     {
         buffer.putInt64Ordered(m_tailIntentCounterIndex, newTail);
-        // store fence = release()
         atomic::release();
     }
 

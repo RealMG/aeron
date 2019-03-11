@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_FRAGMENTASSEMBLYADAPTER_H
-#define AERON_FRAGMENTASSEMBLYADAPTER_H
+#ifndef AERON_FRAGMENT_ASSEMBLY_H
+#define AERON_FRAGMENT_ASSEMBLY_H
 
 #include <unordered_map>
 #include "Aeron.h"
@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    std::size_t m_initialBufferLength;
+    const std::size_t m_initialBufferLength;
     fragment_handler_t m_delegate;
     std::unordered_map<std::int32_t, BufferBuilder> m_builderBySessionIdMap;
 
@@ -94,7 +94,8 @@ private:
         {
             if ((flags & FrameDescriptor::BEGIN_FRAG) == FrameDescriptor::BEGIN_FRAG)
             {
-                auto result = m_builderBySessionIdMap.emplace(header.sessionId(), static_cast<std::uint32_t>(m_initialBufferLength));
+                auto result = m_builderBySessionIdMap.emplace(
+                    header.sessionId(), static_cast<std::uint32_t>(m_initialBufferLength));
                 BufferBuilder& builder = result.first->second;
 
                 builder
@@ -131,4 +132,4 @@ private:
 
 }
 
-#endif //AERON_FRAGMENTASSEMBLYADAPTER_H
+#endif

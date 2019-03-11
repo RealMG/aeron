@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_PUBLICATION_IMAGE_H
-#define AERON_AERON_PUBLICATION_IMAGE_H
+#ifndef AERON_PUBLICATION_IMAGE_H
+#define AERON_PUBLICATION_IMAGE_H
 
 #include "aeron_driver_common.h"
 #include "media/aeron_receive_channel_endpoint.h"
@@ -128,6 +128,7 @@ int aeron_publication_image_create(
     int32_t sender_mtu_length,
     aeron_loss_reporter_t *loss_reporter,
     bool is_reliable,
+    bool is_sparse,
     aeron_system_counters_t *system_counters);
 
 int aeron_publication_image_close(aeron_counters_manager_t *counters_manager, aeron_publication_image_t *image);
@@ -246,4 +247,4 @@ inline size_t aeron_publication_image_num_subscriptions(aeron_publication_image_
     return image->conductor_fields.subscribable.length;
 }
 
-#endif //AERON_AERON_PUBLICATION_IMAGE_H
+#endif //AERON_PUBLICATION_IMAGE_H

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,27 @@
 #include <stdio.h>
 #include <time.h>
 #include <fcntl.h>
+
+#include "util/aeron_platform.h"
+#include "aeron_windows.h"
+#if defined(AERON_COMPILER_MSVC) && defined(AERON_CPU_X64)
+
+    #include <io.h>
+    #include <direct.h>
+    #include <process.h>
+    #include <WinSock2.h>
+    #include <Windows.h>
+
+    #define S_IRWXU 0
+    int mkdir(const char *path, int permission)
+    {
+        return _mkdir(path);
+    }
+
+#else
 #include <unistd.h>
+#endif
+
 #include <inttypes.h>
 #include <stdlib.h>
 #include "util/aeron_error.h"
@@ -36,6 +56,7 @@
 #include "util/aeron_strutil.h"
 #include "util/aeron_fileutil.h"
 #include "aeron_driver.h"
+#include "aeron_socket.h"
 
 void aeron_log_func_stderr(const char *str)
 {
@@ -54,6 +75,11 @@ int64_t aeron_nano_clock()
     {
         return -1;
     }
+#elif defined(AERON_COMPILER_MSVC)
+    if (aeron_clock_gettime_monotonic(&ts) < 0)
+    {
+        return -1;
+    }
 #else
     if (clock_gettime(CLOCK_MONOTONIC_RAW, &ts) < 0)
     {
@@ -61,18 +87,25 @@ int64_t aeron_nano_clock()
     }
 #endif
 
-    return (ts.tv_sec * 1000000000 + ts.tv_nsec);
+    return (ts.tv_sec * 1000000000) + ts.tv_nsec;
 }
 
 int64_t aeron_epoch_clock()
 {
     struct timespec ts;
+#if defined(AERON_COMPILER_MSVC)
+    if (aeron_clock_gettime_realtime(&ts) < 0)
+    {
+        return -1;
+    }
+#else
     if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
     {
         return -1;
     }
+#endif
 
-    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+    return (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 }
 
 extern int aeron_number_of_trailing_zeroes(int32_t value);
@@ -107,6 +140,8 @@ int32_t aeron_randomised_int32()
         exit(EXIT_FAILURE);
     }
 
+#else
+    result = rand() * INT_MAX;
 #endif
     return result;
 }
@@ -137,7 +172,7 @@ static void error_log_reader_save_to_file(
 
 int aeron_report_existing_errors(aeron_mapped_file_t *cnc_map, const char *aeron_dir)
 {
-    char buffer[AERON_MAX_PATH];
+    char buffer[AERON_MAX_PATH * 2];
     int result = 0;
 
     aeron_cnc_metadata_t *metadata = (aeron_cnc_metadata_t *)cnc_map->addr;
@@ -161,7 +196,6 @@ int aeron_report_existing_errors(aeron_mapped_file_t *cnc_map, const char *aeron
                 0);
 
             fprintf(saved_errors_file, "\n%" PRIu64 " distinct errors observed.\n", observations);
-
             fprintf(stderr, "WARNING: Existing errors saved to: %s\n", buffer);
 
             fclose(saved_errors_file);
@@ -180,12 +214,11 @@ int aeron_report_existing_errors(aeron_mapped_file_t *cnc_map, const char *aeron
 
 int aeron_driver_ensure_dir_is_recreated(aeron_driver_t *driver)
 {
-    struct stat sb;
     char buffer[AERON_MAX_PATH];
     const char *dirname = driver->context->aeron_dir;
     aeron_log_func_t log_func = aeron_log_func_none;
 
-    if (stat(dirname, &sb) == 0 && (S_ISDIR(sb.st_mode)))
+    if (aeron_is_directory(dirname))
     {
         if (driver->context->warn_if_dirs_exist)
         {
@@ -196,7 +229,7 @@ int aeron_driver_ensure_dir_is_recreated(aeron_driver_t *driver)
 
         if (driver->context->dirs_delete_on_start)
         {
-            aeron_dir_delete(driver->context->aeron_dir);
+            aeron_delete_directory(driver->context->aeron_dir);
         }
         else
         {
@@ -227,8 +260,7 @@ int aeron_driver_ensure_dir_is_recreated(aeron_driver_t *driver)
             }
 
             aeron_unmap(&cnc_mmap);
-
-            aeron_dir_delete(driver->context->aeron_dir);
+            aeron_delete_directory(driver->context->aeron_dir);
         }
     }
 
@@ -294,6 +326,7 @@ int aeron_driver_create_cnc_file(aeron_driver_t *driver)
     }
 
     aeron_driver_fill_cnc_metadata(driver->context);
+
     return 0;
 }
 
@@ -320,7 +353,7 @@ int aeron_driver_validate_sufficient_socket_buffer_lengths(aeron_driver_t *drive
 {
     int result = -1, probe_fd;
 
-    if ((probe_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    if ((probe_fd = aeron_socket(AF_INET, SOCK_DGRAM, 0)) < 0)
     {
         int errcode = errno;
 
@@ -444,7 +477,7 @@ int aeron_driver_validate_sufficient_socket_buffer_lengths(aeron_driver_t *drive
     result = 0;
 
     cleanup:
-        close(probe_fd);
+        aeron_close_socket(probe_fd);
 
     return result;
 }
@@ -770,7 +803,6 @@ int aeron_driver_main_do_work(aeron_driver_t *driver)
         return -1;
     }
 
-    /* conductor and shared are on 0 */
     return aeron_agent_do_work(&driver->runners[AERON_AGENT_RUNNER_CONDUCTOR]);
 }
 

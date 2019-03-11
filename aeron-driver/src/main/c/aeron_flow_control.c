@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@
 #define _GNU_SOURCE
 #endif
 
-#include <dlfcn.h>
 #include <errno.h>
 #include "protocol/aeron_udp_protocol.h"
 #include "concurrent/aeron_logbuffer_descriptor.h"
 #include "util/aeron_error.h"
+#include "util/aeron_dlopen.h"
 #include "aeron_flow_control.h"
 #include "aeron_alloc.h"
 
@@ -31,9 +31,9 @@ aeron_flow_control_strategy_supplier_func_t aeron_flow_control_strategy_supplier
 {
     aeron_flow_control_strategy_supplier_func_t func = NULL;
 
-    if ((func = (aeron_flow_control_strategy_supplier_func_t)dlsym(RTLD_DEFAULT, strategy_name)) == NULL)
+    if ((func = (aeron_flow_control_strategy_supplier_func_t)aeron_dlsym(RTLD_DEFAULT, strategy_name)) == NULL)
     {
-        aeron_set_err(EINVAL, "could not find flow control strategy %s: dlsym - %s", strategy_name, dlerror());
+        aeron_set_err(EINVAL, "could not find flow control strategy %s: dlsym - %s", strategy_name, aeron_dlerror());
         return NULL;
     }
 
@@ -92,7 +92,7 @@ int64_t aeron_max_flow_control_strategy_on_sm(
     strategy_state->last_position = position > strategy_state->last_position ? position : strategy_state->last_position;
     strategy_state->time_of_last_status_message = now_ns;
 
-    return (snd_lmt > window_edge) ? snd_lmt : window_edge;
+    return snd_lmt > window_edge ? snd_lmt : window_edge;
 }
 
 bool aeron_max_flow_control_strategy_should_linger(
@@ -116,6 +116,7 @@ int aeron_max_flow_control_strategy_fini(aeron_flow_control_strategy_t *strategy
 
 int aeron_max_multicast_flow_control_strategy_supplier(
     aeron_flow_control_strategy_t **strategy,
+    int32_t channel_length,
     const char *channel,
     int32_t stream_id,
     int64_t registration_id,
@@ -147,6 +148,7 @@ int aeron_max_multicast_flow_control_strategy_supplier(
 
 int aeron_unicast_flow_control_strategy_supplier(
     aeron_flow_control_strategy_t **strategy,
+    int32_t channel_length,
     const char *channel,
     int32_t stream_id,
     int64_t registration_id,
@@ -154,5 +156,5 @@ int aeron_unicast_flow_control_strategy_supplier(
     size_t term_buffer_capacity)
 {
     return aeron_max_multicast_flow_control_strategy_supplier(
-        strategy, channel, stream_id, registration_id, initial_term_id, term_buffer_capacity);
+        strategy, channel_length, channel, stream_id, registration_id, initial_term_id, term_buffer_capacity);
 }

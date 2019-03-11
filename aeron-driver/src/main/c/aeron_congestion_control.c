@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@
 #define _GNU_SOURCE
 #endif
 
-#include <dlfcn.h>
 #include <errno.h>
 #include "protocol/aeron_udp_protocol.h"
 #include "concurrent/aeron_logbuffer_descriptor.h"
 #include "util/aeron_error.h"
+#include "util/aeron_dlopen.h"
 #include "aeron_congestion_control.h"
 #include "aeron_alloc.h"
 #include "aeron_driver_context.h"
@@ -33,9 +33,9 @@ aeron_congestion_control_strategy_supplier_func_t aeron_congestion_control_strat
 {
     aeron_congestion_control_strategy_supplier_func_t func = NULL;
 
-    if ((func = (aeron_congestion_control_strategy_supplier_func_t)dlsym(RTLD_DEFAULT, strategy_name)) == NULL)
+    if ((func = (aeron_congestion_control_strategy_supplier_func_t)aeron_dlsym(RTLD_DEFAULT, strategy_name)) == NULL)
     {
-        aeron_set_err(EINVAL, "could not find congestion control strategy %s: dlsym - %s", strategy_name, dlerror());
+        aeron_set_err(EINVAL, "could not find congestion control strategy %s: dlsym - %s", strategy_name, aeron_dlerror());
         return NULL;
     }
 
@@ -87,6 +87,7 @@ int aeron_static_window_congestion_control_strategy_fini(aeron_congestion_contro
 
 int aeron_static_window_congestion_control_strategy_supplier(
     aeron_congestion_control_strategy_t **strategy,
+    int32_t channel_length,
     const char *channel,
     int32_t stream_id,
     int32_t session_id,

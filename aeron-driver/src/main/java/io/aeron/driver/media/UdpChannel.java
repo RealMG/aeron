@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,11 @@ package io.aeron.driver.media;
 import io.aeron.ChannelUri;
 import io.aeron.CommonContext;
 import io.aeron.ErrorCode;
-import io.aeron.driver.Configuration;
 import io.aeron.driver.exceptions.InvalidChannelException;
 import org.agrona.BitUtil;
 
 import java.net.*;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.aeron.driver.media.NetworkUtil.*;
@@ -46,9 +46,10 @@ public final class UdpChannel
 
     private final boolean hasExplicitControl;
     private final boolean isMulticast;
+    private final boolean hasMulticastTtl;
     private final boolean hasTag;
-    private final long tag;
     private final int multicastTtl;
+    private final long tag;
     private final InetSocketAddress remoteData;
     private final InetSocketAddress localData;
     private final InetSocketAddress remoteControl;
@@ -65,6 +66,7 @@ public final class UdpChannel
         isMulticast = context.isMulticast;
         hasTag = context.hasTagId;
         tag = context.tagId;
+        hasMulticastTtl = context.hasMulticastTtl;
         multicastTtl = context.multicastTtl;
         remoteData = context.remoteData;
         localData = context.localData;
@@ -145,9 +147,14 @@ public final class UdpChannel
                     .localDataAddress(resolvedAddress)
                     .remoteDataAddress(endpointAddress)
                     .localInterface(localInterface)
-                    .multicastTtl(getMulticastTtl(channelUri))
                     .protocolFamily(getProtocolFamily(endpointAddress.getAddress()))
                     .canonicalForm(canonicalise(resolvedAddress, endpointAddress));
+
+                final String ttlValue = channelUri.get(CommonContext.TTL_PARAM_NAME);
+                if (null != ttlValue)
+                {
+                    context.hasMulticastTtl(true).multicastTtl(Integer.parseInt(ttlValue));
+                }
             }
             else if (null != explicitControlAddress)
             {
@@ -286,6 +293,16 @@ public final class UdpChannel
     }
 
     /**
+     * Has this channel got a multicast TTL value set so that {@link #multicastTtl()} is valid.
+     *
+     * @return true if this channel is a multicast TTL set otherwise false.
+     */
+    public boolean isHasMulticastTtl()
+    {
+        return hasMulticastTtl;
+    }
+
+    /**
      * Multicast TTL information
      *
      * @return multicast TTL value
@@ -321,7 +338,7 @@ public final class UdpChannel
 
         final UdpChannel that = (UdpChannel)o;
 
-        return !(canonicalForm != null ? !canonicalForm.equals(that.canonicalForm) : that.canonicalForm != null);
+        return Objects.equals(canonicalForm, that.canonicalForm);
     }
 
     public int hashCode()
@@ -374,6 +391,11 @@ public final class UdpChannel
         return protocolFamily;
     }
 
+    /**
+     * Get the tag value on the channel which is only valid if {@link #hasTag()} is true.
+     *
+     * @return the tag value on the channel.
+     */
     public long tag()
     {
         return tag;
@@ -389,11 +411,22 @@ public final class UdpChannel
         return hasExplicitControl;
     }
 
+    /**
+     * Has the URI a tag to indicate entity relationships and if {@link #tag()} is valid.
+     *
+     * @return true if the channel has a tag.
+     */
     public boolean hasTag()
     {
         return hasTag;
     }
 
+    /**
+     * Does this channel have a tag match to another channel including endpoints.
+     *
+     * @param udpChannel to match against.
+     * @return true if there is a match otherwise false.
+     */
     public boolean doesTagMatch(final UdpChannel udpChannel)
     {
         if (!hasTag || !udpChannel.hasTag() || tag != udpChannel.tag())
@@ -475,17 +508,6 @@ public final class UdpChannel
         }
 
         return null;
-    }
-
-    private static int getMulticastTtl(final ChannelUri uri)
-    {
-        final String ttlValue = uri.get(CommonContext.TTL_PARAM_NAME);
-        if (null != ttlValue)
-        {
-            return Integer.parseInt(ttlValue);
-        }
-
-        return Configuration.SOCKET_MULTICAST_TTL;
     }
 
     private static InetSocketAddress getExplicitControlAddress(final ChannelUri uri)
@@ -607,6 +629,7 @@ public final class UdpChannel
         ChannelUri channelUri;
         boolean hasExplicitControl = false;
         boolean isMulticast = false;
+        boolean hasMulticastTtl = false;
         boolean hasTagId = false;
         boolean hasNoDistinguishingCharacteristic = false;
 
@@ -655,6 +678,12 @@ public final class UdpChannel
         Context protocolFamily(final ProtocolFamily protocolFamily)
         {
             this.protocolFamily = protocolFamily;
+            return this;
+        }
+
+        Context hasMulticastTtl(final boolean hasMulticastTtl)
+        {
+            this.hasMulticastTtl = hasMulticastTtl;
             return this;
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_RINGBUFFER_RECORD_DESCRIPTOR__
-#define INCLUDED_AERON_CONCURRENT_RINGBUFFER_RECORD_DESCRIPTOR__
+#ifndef AERON_RING_BUFFER_RECORD_DESCRIPTOR_H
+#define AERON_RING_BUFFER_RECORD_DESCRIPTOR_H
 
 #include <util/Index.h>
 #include <util/StringUtil.h>
@@ -40,6 +40,8 @@ namespace aeron { namespace concurrent { namespace ringbuffer {
 * </pre>
 */
 
+#include <string>
+
 namespace RecordDescriptor {
 
     static const util::index_t HEADER_LENGTH = sizeof(std::int32_t) * 2;
@@ -63,17 +65,17 @@ namespace RecordDescriptor {
 
     inline static std::int64_t makeHeader(std::int32_t length, std::int32_t msgTypeId)
     {
-        return (((std::int64_t)msgTypeId & 0xFFFFFFFF) << 32) | (length & 0xFFFFFFFF);
+        return ((static_cast<std::int64_t>(msgTypeId) & 0xFFFFFFFF) << 32) | (length & 0xFFFFFFFF);
     }
 
     inline static std::int32_t recordLength(std::int64_t header)
     {
-        return (std::int32_t)header;
+        return static_cast<std::int32_t>(header);
     }
 
     inline static std::int32_t messageTypeId(std::int64_t header)
     {
-        return (std::int32_t)(header >> 32);
+        return static_cast<std::int32_t>(header >> 32);
     }
 
     inline static void checkMsgTypeId(std::int32_t msgTypeId)
@@ -81,7 +83,7 @@ namespace RecordDescriptor {
         if (msgTypeId < 1)
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("Message type id must be greater than zero, msgTypeId=%d", msgTypeId), SOURCEINFO);
+                "Message type id must be greater than zero, msgTypeId=" + std::to_string(msgTypeId), SOURCEINFO);
         }
     }
 }

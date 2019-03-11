@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.aeron;
 
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
+import io.aeron.logbuffer.LogBufferDescriptor;
 import org.agrona.CloseHelper;
 import org.agrona.collections.MutableInteger;
 import org.junit.After;
@@ -49,6 +50,7 @@ public class PublicationUnblockTest
     private final MediaDriver driver = MediaDriver.launch(new MediaDriver.Context()
         .threadingMode(ThreadingMode.SHARED)
         .errorHandler(Throwable::printStackTrace)
+        .publicationTermBufferLength(LogBufferDescriptor.TERM_MIN_LENGTH)
         .timerIntervalNs(TimeUnit.MILLISECONDS.toNanos(100))
         .publicationUnblockTimeoutNs(TimeUnit.MILLISECONDS.toNanos(100)));
 
@@ -70,15 +72,15 @@ public class PublicationUnblockTest
         final FragmentHandler fragmentHandler = (buffer, offset, length, header) -> fragmentCount.value++;
 
         try (Subscription subscription = aeron.addSubscription(channel, STREAM_ID);
-            Publication publicationA = aeron.addPublication(channel, STREAM_ID);
-            Publication publicationB = aeron.addPublication(channel, STREAM_ID))
+            Publication publicationOne = aeron.addPublication(channel, STREAM_ID);
+            Publication publicationTwo = aeron.addPublication(channel, STREAM_ID))
         {
-            final BufferClaim bufferClaim = new BufferClaim();
             final UnsafeBuffer srcBuffer = new UnsafeBuffer(new byte[driver.context().mtuLength()]);
             final int length = 128;
             srcBuffer.setMemory(0, length, (byte)66);
+            final BufferClaim bufferClaim = new BufferClaim();
 
-            while (publicationA.tryClaim(length, bufferClaim) < 0L)
+            while (publicationOne.tryClaim(length, bufferClaim) < 0L)
             {
                 SystemTest.checkInterruptedStatus();
                 Thread.yield();
@@ -87,21 +89,19 @@ public class PublicationUnblockTest
             bufferClaim.buffer().setMemory(bufferClaim.offset(), length, (byte)65);
             bufferClaim.commit();
 
-            while (publicationB.offer(srcBuffer, 0, length) < 0L)
+            while (publicationTwo.offer(srcBuffer, 0, length) < 0L)
             {
                 SystemTest.checkInterruptedStatus();
                 Thread.yield();
             }
 
-            while (publicationA.tryClaim(length, bufferClaim) < 0L)
+            while (publicationOne.tryClaim(length, bufferClaim) < 0L)
             {
                 SystemTest.checkInterruptedStatus();
                 Thread.yield();
             }
 
-            // no commit of publicationA
-
-            while (publicationB.offer(srcBuffer, 0, length) < 0L)
+            while (publicationTwo.offer(srcBuffer, 0, length) < 0L)
             {
                 SystemTest.checkInterruptedStatus();
                 Thread.yield();
@@ -112,7 +112,7 @@ public class PublicationUnblockTest
             do
             {
                 final int fragments = subscription.poll(fragmentHandler, FRAGMENT_COUNT_LIMIT);
-                if (numFragments == 0)
+                if (fragments == 0)
                 {
                     SystemTest.checkInterruptedStatus();
                     Thread.yield();

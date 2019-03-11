@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,4 +133,9 @@ public class ControlProtocolEvents
      * Inform clients of removal of counter.
      */
     public static final int ON_UNAVAILABLE_COUNTER = 0x0F09;
+
+    /**
+     * Inform clients of client timeout.
+     */
+    public static final int ON_CLIENT_TIMEOUT = 0x0F0A;
 }

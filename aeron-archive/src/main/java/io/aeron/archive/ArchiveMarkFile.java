@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,11 @@
  */
 package io.aeron.archive;
 
+import io.aeron.archive.client.AeronArchive;
 import io.aeron.archive.codecs.mark.MarkFileHeaderDecoder;
 import io.aeron.archive.codecs.mark.MarkFileHeaderEncoder;
 import io.aeron.archive.codecs.mark.VarAsciiEncodingEncoder;
-import org.agrona.BitUtil;
-import org.agrona.CloseHelper;
-import org.agrona.MarkFile;
-import org.agrona.SystemUtil;
+import org.agrona.*;
 import org.agrona.concurrent.EpochClock;
 import org.agrona.concurrent.UnsafeBuffer;
 
@@ -66,10 +64,10 @@ public class ArchiveMarkFile implements AutoCloseable
             epochClock,
             (version) ->
             {
-                if (version != MarkFileHeaderDecoder.SCHEMA_VERSION)
+                if (SemanticVersion.major(version) != AeronArchive.Configuration.MAJOR_VERSION)
                 {
-                    throw new IllegalArgumentException("mark file version " + version +
-                        " does not match software:" + MarkFileHeaderDecoder.SCHEMA_VERSION);
+                    throw new IllegalArgumentException("mark file major version " + SemanticVersion.major(version) +
+                        " does not match software:" + AeronArchive.Configuration.MAJOR_VERSION);
                 }
             },
             null);
@@ -98,10 +96,10 @@ public class ArchiveMarkFile implements AutoCloseable
             epochClock,
             (version) ->
             {
-                if (version != MarkFileHeaderDecoder.SCHEMA_VERSION)
+                if (SemanticVersion.major(version) != AeronArchive.Configuration.MAJOR_VERSION)
                 {
-                    throw new IllegalArgumentException("mark file version " + version +
-                        " does not match software:" + MarkFileHeaderDecoder.SCHEMA_VERSION);
+                    throw new IllegalArgumentException("mark file major version " + SemanticVersion.major(version) +
+                        " does not match software:" + AeronArchive.Configuration.MAJOR_VERSION);
                 }
             },
             logger);
@@ -118,7 +116,7 @@ public class ArchiveMarkFile implements AutoCloseable
 
     public void signalReady()
     {
-        markFile.signalReady(MarkFileHeaderEncoder.SCHEMA_VERSION);
+        markFile.signalReady(AeronArchive.Configuration.SEMANTIC_VERSION);
     }
 
     public void updateActivityTimestamp(final long nowMs)

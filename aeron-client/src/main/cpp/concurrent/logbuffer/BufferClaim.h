@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_BUFFER_CLAIM__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_BUFFER_CLAIM__
+#ifndef AERON_CONCURRENT_BUFFER_CLAIM_H
+#define AERON_CONCURRENT_BUFFER_CLAIM_H
 
 #include <util/Index.h>
 #include <concurrent/AtomicBuffer.h>
@@ -81,6 +81,52 @@ public:
     inline util::index_t length() const
     {
         return m_buffer.capacity() - DataFrameHeader::LENGTH;
+    }
+
+    /**
+ * Get the value of the flags field.
+ *
+ * @return the value of the header flags field.
+ */
+    inline std::uint8_t flags() const
+    {
+        return m_buffer.getUInt8(DataFrameHeader::FLAGS_FIELD_OFFSET);
+    }
+
+    /**
+     * Set the value of the header flags field.
+     *
+     * @param flags value to be set in the header.
+     * @return this for a fluent API.
+     */
+    inline this_t& flags(const std::uint8_t flags)
+    {
+        m_buffer.putUInt8(DataFrameHeader::FLAGS_FIELD_OFFSET, flags);
+
+        return *this;
+    }
+
+    /**
+     * Get the value of the header type field.
+     *
+     * @return the value of the header type field.
+     */
+    inline std::uint16_t headerType() const
+    {
+        return m_buffer.getUInt16(DataFrameHeader::TYPE_FIELD_OFFSET);
+    }
+
+    /**
+     * Set the value of the header type field.
+     *
+     * @param type value to be set in the header.
+     * @return this for a fluent API.
+     */
+    inline this_t& headerType(const std::uint16_t type)
+    {
+        m_buffer.putUInt16(DataFrameHeader::TYPE_FIELD_OFFSET, type);
+
+        return *this;
     }
 
     /**

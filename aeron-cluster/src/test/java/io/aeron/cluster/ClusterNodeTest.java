@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,14 +52,14 @@ public class ClusterNodeTest
             new MediaDriver.Context()
                 .threadingMode(ThreadingMode.SHARED)
                 .termBufferSparseFile(true)
-                .errorHandler(Throwable::printStackTrace)
+                .errorHandler(TestUtil.errorHandler(0))
                 .dirDeleteOnStart(true),
             new Archive.Context()
                 .maxCatalogEntries(MAX_CATALOG_ENTRIES)
                 .threadingMode(ArchiveThreadingMode.SHARED)
                 .deleteArchiveOnStart(true),
             new ConsensusModule.Context()
-                .errorHandler(Throwable::printStackTrace)
+                .errorHandler(TestUtil.errorHandler(0))
                 .terminationHook(TestUtil.TERMINATION_HOOK)
                 .deleteDirOnStart(true));
     }
@@ -190,8 +190,10 @@ public class ClusterNodeTest
     {
         final ClusteredService timedService = new StubClusteredService()
         {
-            long clusterSessionId;
-            String msg;
+            private final ExpandableArrayBuffer buffer = new ExpandableArrayBuffer();
+            private long clusterSessionId;
+            private int nextCorrelationId;
+            private String msg;
 
             public void onSessionMessage(
                 final ClientSession session,
@@ -204,7 +206,7 @@ public class ClusterNodeTest
                 clusterSessionId = session.id();
                 msg = buffer.getStringWithoutLengthAscii(offset, length);
 
-                while (!cluster.scheduleTimer(clusterSessionId, timestampMs + 100))
+                while (!cluster.scheduleTimer(serviceCorrelationId(nextCorrelationId++), timestampMs + 100))
                 {
                     cluster.idle();
                 }
@@ -213,7 +215,6 @@ public class ClusterNodeTest
             public void onTimerEvent(final long correlationId, final long timestampMs)
             {
                 final String responseMsg = msg + "-scheduled";
-                final ExpandableArrayBuffer buffer = new ExpandableArrayBuffer();
                 buffer.putStringWithoutLengthAscii(0, responseMsg);
                 final ClientSession clientSession = cluster.getClientSession(clusterSessionId);
 
@@ -228,7 +229,7 @@ public class ClusterNodeTest
             new ClusteredServiceContainer.Context()
                 .clusteredService(timedService)
                 .terminationHook(TestUtil.TERMINATION_HOOK)
-                .errorHandler(Throwable::printStackTrace));
+                .errorHandler(TestUtil.errorHandler(0)));
     }
 
     private AeronCluster connectToCluster(final EgressListener egressListener)

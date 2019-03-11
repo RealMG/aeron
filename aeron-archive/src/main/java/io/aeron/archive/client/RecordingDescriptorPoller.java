@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,6 +134,12 @@ public class RecordingDescriptorPoller implements ControlledFragmentHandler
     {
         messageHeaderDecoder.wrap(buffer, offset);
 
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ArchiveException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
         final int templateId = messageHeaderDecoder.templateId();
         switch (templateId)
         {
@@ -210,9 +216,6 @@ public class RecordingDescriptorPoller implements ControlledFragmentHandler
                     }
                 }
                 break;
-
-            default:
-                throw new ArchiveException("unknown templateId: " + templateId);
         }
 
         return Action.CONTINUE;

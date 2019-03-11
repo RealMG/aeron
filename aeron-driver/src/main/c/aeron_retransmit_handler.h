@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_RETRANSMIT_HANDLER_H
-#define AERON_AERON_RETRANSMIT_HANDLER_H
+#ifndef AERON_RETRANSMIT_HANDLER_H
+#define AERON_RETRANSMIT_HANDLER_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -77,4 +77,4 @@ int aeron_retransmit_handler_process_timeouts(
     aeron_retransmit_handler_t *handler,
     int64_t now_ns);
 
-#endif //AERON_AERON_RETRANSMIT_HANDLER_H
+#endif //AERON_RETRANSMIT_HANDLER_H

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ int aeron_alloc_aligned(void **ptr, size_t *offset, size_t size, size_t alignmen
 
 int aeron_reallocf(void **ptr, size_t size)
 {
-#if defined(__linux__)
+#if defined(__linux__) || defined(AERON_COMPILER_MSVC)
     /* mimic reallocf */
     if ((*ptr = realloc(*ptr, size)) == NULL)
     {

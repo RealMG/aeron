@@ -1,5 +1,5 @@
 /*
- *  Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,12 +66,12 @@ public class ClusterControl
         SNAPSHOT(3),
 
         /**
-         * Shut down the cluster in an orderly fashion by taking a snapshot first.
+         * Shut down the cluster in an orderly fashion by taking a snapshot first then terminating.
          */
         SHUTDOWN(4),
 
         /**
-         * Abort processing and shutdown the cluster without taking a snapshot.
+         * Abort processing and terminate the cluster without taking a snapshot.
          */
         ABORT(5);
 

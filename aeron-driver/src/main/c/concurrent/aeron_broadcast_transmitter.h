@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_BROADCAST_TRANSMITTER_H
-#define AERON_AERON_BROADCAST_TRANSMITTER_H
+#ifndef AERON_BROADCAST_TRANSMITTER_H
+#define AERON_BROADCAST_TRANSMITTER_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -67,4 +67,4 @@ int aeron_broadcast_transmitter_transmit(
     const void *msg,
     size_t length);
 
-#endif //AERON_AERON_BROADCAST_TRANSMITTER_H
+#endif //AERON_BROADCAST_TRANSMITTER_H

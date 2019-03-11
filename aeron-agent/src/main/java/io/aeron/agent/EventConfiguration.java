@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ public class EventConfiguration
         CMD_OUT_SUBSCRIPTION_READY,
         CMD_OUT_COUNTER_READY,
         CMD_OUT_ON_UNAVAILABLE_COUNTER,
+        CMD_OUT_ON_CLIENT_TIMEOUT,
         SEND_CHANNEL_CREATION,
         RECEIVE_CHANNEL_CREATION,
         SEND_CHANNEL_CLOSE,

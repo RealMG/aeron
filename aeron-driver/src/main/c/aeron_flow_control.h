@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_FLOW_CONTROL_H
-#define AERON_AERON_FLOW_CONTROL_H
+#ifndef AERON_FLOW_CONTROL_H
+#define AERON_FLOW_CONTROL_H
 
-#include <netinet/in.h>
+#include "aeron_socket.h"
 #include "aeron_driver_common.h"
 
 typedef struct aeron_flow_control_strategy_stct aeron_flow_control_strategy_t;
@@ -60,6 +60,7 @@ aeron_flow_control_strategy_t;
 
 typedef int (*aeron_flow_control_strategy_supplier_func_t)(
     aeron_flow_control_strategy_t **strategy,
+    int32_t channel_length,
     const char *channel,
     int32_t stream_id,
     int64_t registration_id,
@@ -68,4 +69,4 @@ typedef int (*aeron_flow_control_strategy_supplier_func_t)(
 
 aeron_flow_control_strategy_supplier_func_t aeron_flow_control_strategy_supplier_load(const char *strategy_name);
 
-#endif //AERON_AERON_FLOW_CONTROL_H
+#endif //AERON_FLOW_CONTROL_H

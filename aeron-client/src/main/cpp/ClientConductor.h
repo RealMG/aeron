@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CLIENT_CONDUCTOR__
-#define INCLUDED_AERON_CLIENT_CONDUCTOR__
+#ifndef AERON_CLIENT_CONDUCTOR_H
+#define AERON_CLIENT_CONDUCTOR_H
 
 #include <vector>
 #include <mutex>
@@ -72,14 +72,15 @@ public:
         m_errorHandler(errorHandler),
         m_onAvailableCounterHandler(availableCounterHandler),
         m_onUnavailableCounterHandler(unavailableCounterHandler),
-        m_epochClock(epochClock),
-        m_timeOfLastKeepalive(epochClock()),
-        m_timeOfLastCheckManagedResources(epochClock()),
-        m_timeOfLastDoWork(epochClock()),
+        m_epochClock(std::move(epochClock)),
+        m_timeOfLastKeepalive(m_epochClock()),
+        m_timeOfLastCheckManagedResources(m_epochClock()),
+        m_timeOfLastDoWork(m_epochClock()),
         m_driverTimeoutMs(driverTimeoutMs),
         m_resourceLingerTimeoutMs(resourceLingerTimeoutMs),
         m_interServiceTimeoutMs(static_cast<long>(interServiceTimeoutNs / 1000000)),
-        m_driverActive(true)
+        m_driverActive(true),
+        m_isClosed(false)
     {
     }
 
@@ -120,27 +121,18 @@ public:
     void releaseSubscription(std::int64_t registrationId, struct ImageList *imageList);
 
     std::int64_t addCounter(
-        std::int32_t typeId, const std::uint8_t *keyBuffer, std::size_t keyLength, const std::string& label);
+        std::int32_t typeId,
+        const std::uint8_t *keyBuffer,
+        std::size_t keyLength,
+        const std::string& label);
     std::shared_ptr<Counter> findCounter(std::int64_t registrationId);
     void releaseCounter(std::int64_t registrationId);
 
-    void onNewPublication(
-        std::int32_t streamId,
-        std::int32_t sessionId,
-        std::int32_t publicationLimitCounterId,
-        std::int32_t channelStatusIndicatorId,
-        const std::string& logFileName,
-        std::int64_t registrationId,
-        std::int64_t originalRegistrationId);
+    void onNewPublication(std::int64_t registrationId, std::int64_t originalRegistrationId, std::int32_t streamId, std::int32_t sessionId,
+        std::int32_t publicationLimitCounterId, std::int32_t channelStatusIndicatorId, const std::string &logFileName);
 
-    void onNewExclusivePublication(
-        std::int32_t streamId,
-        std::int32_t sessionId,
-        std::int32_t publicationLimitCounterId,
-        std::int32_t channelStatusIndicatorId,
-        const std::string& logFileName,
-        std::int64_t registrationId,
-        std::int64_t originalRegistrationId);
+    void onNewExclusivePublication(std::int64_t registrationId, std::int64_t originalRegistrationId, std::int32_t streamId,
+        std::int32_t sessionId, std::int32_t publicationLimitCounterId, std::int32_t channelStatusIndicatorId, const std::string &logFileName);
 
     void onSubscriptionReady(
         std::int64_t registrationId,
@@ -153,17 +145,10 @@ public:
         std::int32_t errorCode,
         const std::string& errorMessage);
 
-    void onAvailableImage(
-        std::int32_t streamId,
-        std::int32_t sessionId,
-        const std::string &logFilename,
-        const std::string &sourceIdentity,
-        std::int32_t subscriberPositionIndicatorId,
-        std::int64_t subscriberPositionRegistrationId,
-        std::int64_t correlationId);
+    void onAvailableImage(std::int64_t correlationId, std::int32_t sessionId, std::int32_t subscriberPositionId,
+        std::int64_t subscriptionRegistrationId, const std::string &logFilename, const std::string &sourceIdentity);
 
     void onUnavailableImage(
-        std::int32_t streamId,
         std::int64_t correlationId,
         std::int64_t subscriptionRegistrationId);
 
@@ -175,7 +160,9 @@ public:
         std::int64_t registrationId,
         std::int32_t counterId);
 
-    void onInterServiceTimeout(long long now);
+    void onClientTimeout(std::int64_t clientId);
+
+    void closeAllResources(long long now);
 
     void addDestination(std::int64_t publicationRegistrationId, const std::string& endpointChannel);
     void removeDestination(std::int64_t publicationRegistrationId, const std::string& endpointChannel);
@@ -201,6 +188,16 @@ public:
             default:
                 return m_countersReader.getCounterValue(counterId);
         }
+    }
+
+    inline bool isClosed() const
+    {
+        return std::atomic_load_explicit(&m_isClosed, std::memory_order_acquire);
+    }
+
+    inline void forceClose()
+    {
+        std::atomic_store_explicit(&m_isClosed, true, std::memory_order_release);
     }
 
 protected:
@@ -234,7 +231,10 @@ private:
 
         PublicationStateDefn(
             const std::string& channel, std::int64_t registrationId, std::int32_t streamId, long long now) :
-            m_channel(channel), m_registrationId(registrationId), m_streamId(streamId), m_timeOfRegistration(now)
+            m_channel(channel),
+            m_registrationId(registrationId),
+            m_streamId(streamId),
+            m_timeOfRegistration(now)
         {
         }
     };
@@ -257,7 +257,10 @@ private:
 
         ExclusivePublicationStateDefn(
             const std::string& channel, std::int64_t registrationId, std::int32_t streamId, long long now) :
-            m_channel(channel), m_registrationId(registrationId), m_streamId(streamId), m_timeOfRegistration(now)
+            m_channel(channel),
+            m_registrationId(registrationId),
+            m_streamId(streamId),
+            m_timeOfRegistration(now)
         {
         }
     };
@@ -328,7 +331,8 @@ private:
         std::shared_ptr<LogBuffers> m_logBuffers;
 
         LogBuffersLingerDefn(long long now, std::shared_ptr<LogBuffers> buffers) :
-            m_timeOfLastStatusChange(now), m_logBuffers(buffers)
+            m_timeOfLastStatusChange(now),
+            m_logBuffers(std::move(buffers))
         {
         }
     };
@@ -365,6 +369,7 @@ private:
     long m_interServiceTimeoutMs;
 
     std::atomic<bool> m_driverActive;
+    std::atomic<bool> m_isClosed;
 
     inline int onHeartbeatCheckTimeouts()
     {
@@ -375,10 +380,10 @@ private:
 
         if (now > (m_timeOfLastDoWork + m_interServiceTimeoutMs))
         {
-            onInterServiceTimeout(now);
+            closeAllResources(now);
 
             ConductorServiceTimeoutException exception(
-                strPrintf("Timeout between service calls over %d ms", m_interServiceTimeoutMs), SOURCEINFO);
+                "timeout between service calls over " + std::to_string(m_interServiceTimeoutMs) + " ms", SOURCEINFO);
             m_errorHandler(exception);
         }
 
@@ -393,7 +398,7 @@ private:
                 m_driverActive = false;
 
                 DriverTimeoutException exception(
-                    strPrintf("Driver has been inactive for over %d ms", m_driverTimeoutMs), SOURCEINFO);
+                    "driver has been inactive for over " + std::to_string(m_driverTimeoutMs) + " ms", SOURCEINFO);
                 m_errorHandler(exception);
             }
 
@@ -415,7 +420,7 @@ private:
     {
         if (!m_driverActive)
         {
-            throw DriverTimeoutException("Driver is inactive", SOURCEINFO);
+            throw DriverTimeoutException("driver is inactive", SOURCEINFO);
         }
     }
 
@@ -423,11 +428,29 @@ private:
     {
         if (!m_driverActive)
         {
-            DriverTimeoutException exception("Driver is inactive", SOURCEINFO);
+            DriverTimeoutException exception("driver is inactive", SOURCEINFO);
             m_errorHandler(exception);
         }
     }
+
+    inline void ensureOpen()
+    {
+        if (isClosed())
+        {
+            throw AeronException("Aeron client conductor is closed", SOURCEINFO);
+        }
+    }
 };
+
+inline long long systemNanoClock()
+{
+    using namespace std::chrono;
+
+    high_resolution_clock::time_point now = high_resolution_clock::now();
+    nanoseconds ns = duration_cast<nanoseconds>(now.time_since_epoch());
+
+    return ns.count();
+}
 
 }
 

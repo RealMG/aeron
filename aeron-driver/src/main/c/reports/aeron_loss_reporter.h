@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_LOSS_REPORTER_H
-#define AERON_AERON_LOSS_REPORTER_H
+#ifndef AERON_LOSS_REPORTER_H
+#define AERON_LOSS_REPORTER_H
 
 #include <stdint.h>
 #include <string.h>
@@ -97,4 +97,4 @@ typedef void (*aeron_loss_reporter_read_entry_func_t)(
 size_t aeron_loss_reporter_read(
     const uint8_t *buffer, size_t capacity, aeron_loss_reporter_read_entry_func_t entry_func, void *clientd);
 
-#endif //AERON_AERON_LOSS_REPORTER_H
+#endif //AERON_LOSS_REPORTER_H

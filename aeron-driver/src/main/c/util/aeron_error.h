@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_ERROR_H
-#define AERON_AERON_ERROR_H
+#ifndef AERON_ERROR_H
+#define AERON_ERROR_H
 
 #include "aeron_driver_common.h"
 
@@ -30,4 +30,8 @@ int aeron_errcode();
 const char *aeron_errmsg();
 void aeron_set_err(int errcode, const char *format, ...);
 
-#endif //AERON_AERON_ERROR_H
+#ifdef _MSC_VER
+void aeron_set_windows_error();
+#endif
+
+#endif //AERON_ERROR_H

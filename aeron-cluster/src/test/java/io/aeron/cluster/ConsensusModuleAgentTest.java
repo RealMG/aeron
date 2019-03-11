@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,14 +31,15 @@ import org.agrona.concurrent.SystemEpochClock;
 import org.agrona.concurrent.status.AtomicCounter;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
 import java.util.concurrent.TimeUnit;
 
 import static io.aeron.cluster.ClusterControl.ToggleState.*;
-import static io.aeron.cluster.ConsensusModule.Configuration.SESSION_LIMIT_MSG;
-import static io.aeron.cluster.ConsensusModule.Configuration.SESSION_TIMEOUT_MSG;
+import static io.aeron.cluster.ConsensusModule.Configuration.*;
+import static io.aeron.cluster.client.AeronCluster.Configuration.SEMANTIC_VERSION;
 import static java.lang.Boolean.TRUE;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
@@ -52,7 +53,7 @@ public class ConsensusModuleAgentTest
     private final EgressPublisher mockEgressPublisher = mock(EgressPublisher.class);
     private final LogPublisher mockLogPublisher = mock(LogPublisher.class);
     private final Aeron mockAeron = mock(Aeron.class);
-    private final ExclusivePublication mockResponsePublication = mock(ExclusivePublication.class);
+    private final ConcurrentPublication mockResponsePublication = mock(ConcurrentPublication.class);
     private final Counter mockTimedOutClientCounter = mock(Counter.class);
 
     private final ConsensusModule.Context ctx = new ConsensusModule.Context()
@@ -83,7 +84,7 @@ public class ConsensusModuleAgentTest
         when(mockLogPublisher.appendSessionOpen(any(), anyLong(), anyLong())).thenReturn(128L);
         when(mockLogPublisher.appendClusterAction(anyLong(), anyLong(), anyLong(), any(ClusterAction.class)))
             .thenReturn(TRUE);
-        when(mockAeron.addExclusivePublication(anyString(), anyInt())).thenReturn(mockResponsePublication);
+        when(mockAeron.addPublication(anyString(), anyInt())).thenReturn(mockResponsePublication);
         when(mockAeron.addSubscription(anyString(), anyInt())).thenReturn(mock(Subscription.class));
         when(mockAeron.addSubscription(anyString(), anyInt(), eq(null), any(UnavailableImageHandler.class)))
             .thenReturn(mock(Subscription.class));
@@ -103,7 +104,7 @@ public class ConsensusModuleAgentTest
         agent.state(ConsensusModule.State.ACTIVE);
         agent.role(Cluster.Role.LEADER);
         agent.appendedPositionCounter(mock(ReadableCounter.class));
-        agent.onSessionConnect(correlationIdOne, 2, RESPONSE_CHANNEL_ONE, new byte[0]);
+        agent.onSessionConnect(correlationIdOne, 2, SEMANTIC_VERSION, RESPONSE_CHANNEL_ONE, new byte[0]);
 
         clock.update(1);
         agent.doWork();
@@ -111,7 +112,7 @@ public class ConsensusModuleAgentTest
         verify(mockLogPublisher).appendSessionOpen(any(ClusterSession.class), anyLong(), anyLong());
 
         final long correlationIdTwo = 2L;
-        agent.onSessionConnect(correlationIdTwo, 3, RESPONSE_CHANNEL_TWO, new byte[0]);
+        agent.onSessionConnect(correlationIdTwo, 3, SEMANTIC_VERSION, RESPONSE_CHANNEL_TWO, new byte[0]);
         clock.update(2);
         agent.doWork();
 
@@ -134,7 +135,7 @@ public class ConsensusModuleAgentTest
         agent.state(ConsensusModule.State.ACTIVE);
         agent.role(Cluster.Role.LEADER);
         agent.appendedPositionCounter(mock(ReadableCounter.class));
-        agent.onSessionConnect(correlationId, 2, RESPONSE_CHANNEL_ONE, new byte[0]);
+        agent.onSessionConnect(correlationId, 2, SEMANTIC_VERSION, RESPONSE_CHANNEL_ONE, new byte[0]);
 
         agent.doWork();
 
@@ -152,6 +153,40 @@ public class ConsensusModuleAgentTest
         verify(mockLogPublisher).appendSessionClose(any(ClusterSession.class), anyLong(), eq(timeoutMs));
         verify(mockEgressPublisher).sendEvent(
             any(ClusterSession.class), anyLong(), anyInt(), eq(EventCode.ERROR), eq(SESSION_TIMEOUT_MSG));
+    }
+
+    @Test
+    public void shouldCloseTerminatedSession()
+    {
+        final CachedEpochClock clock = new CachedEpochClock();
+        final long startMs = 7L;
+        clock.update(startMs);
+
+        ctx.epochClock(clock);
+
+        final ConsensusModuleAgent agent = new ConsensusModuleAgent(ctx);
+
+        final long correlationId = 1L;
+        agent.state(ConsensusModule.State.ACTIVE);
+        agent.role(Cluster.Role.LEADER);
+        agent.appendedPositionCounter(mock(ReadableCounter.class));
+        agent.onSessionConnect(correlationId, 2, SEMANTIC_VERSION, RESPONSE_CHANNEL_ONE, new byte[0]);
+
+        agent.doWork();
+
+        final ArgumentCaptor<ClusterSession> sessionCaptor = ArgumentCaptor.forClass(ClusterSession.class);
+
+        verify(mockLogPublisher).appendSessionOpen(sessionCaptor.capture(), anyLong(), eq(startMs));
+
+        final long timeMs = startMs + 1;
+        clock.update(timeMs);
+        agent.doWork();
+
+        agent.onServiceCloseSession(sessionCaptor.getValue().id());
+
+        verify(mockLogPublisher).appendSessionClose(any(ClusterSession.class), anyLong(), eq(timeMs));
+        verify(mockEgressPublisher).sendEvent(
+            any(ClusterSession.class), anyLong(), anyInt(), eq(EventCode.ERROR), eq(SESSION_TERMINATED_MSG));
     }
 
     @Test

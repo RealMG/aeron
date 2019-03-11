@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,11 @@ package io.aeron.cluster.service;
 
 import io.aeron.Image;
 import io.aeron.ImageControlledFragmentAssembler;
+import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.*;
-import io.aeron.logbuffer.ControlledFragmentHandler;
-import io.aeron.logbuffer.Header;
+import io.aeron.logbuffer.*;
 import io.aeron.status.ReadableCounter;
-import org.agrona.CloseHelper;
-import org.agrona.DirectBuffer;
+import org.agrona.*;
 
 /**
  * Adapter for reading a log with a upper bound applied beyond which the consumer cannot progress.
@@ -43,7 +42,7 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
     private final TimerEventDecoder timerEventDecoder = new TimerEventDecoder();
     private final ClusterActionRequestDecoder actionRequestDecoder = new ClusterActionRequestDecoder();
     private final NewLeadershipTermEventDecoder newLeadershipTermEventDecoder = new NewLeadershipTermEventDecoder();
-    private final ClusterChangeEventDecoder clusterChangeEventDecoder = new ClusterChangeEventDecoder();
+    private final MembershipChangeEventDecoder membershipChangeEventDecoder = new MembershipChangeEventDecoder();
 
     private final Image image;
     private final ReadableCounter upperBound;
@@ -80,8 +79,14 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
     public Action onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         messageHeaderDecoder.wrap(buffer, offset);
-        final int templateId = messageHeaderDecoder.templateId();
 
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
+        final int templateId = messageHeaderDecoder.templateId();
         if (templateId == SessionHeaderDecoder.TEMPLATE_ID)
         {
             sessionHeaderDecoder.wrap(
@@ -125,6 +130,8 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
                 openEventDecoder.getEncodedPrincipal(encodedPrincipal, 0, encodedPrincipal.length);
 
                 agent.onSessionOpen(
+                    openEventDecoder.leadershipTermId(),
+                    header.position(),
                     openEventDecoder.clusterSessionId(),
                     openEventDecoder.timestamp(),
                     openEventDecoder.responseStreamId(),
@@ -140,6 +147,8 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
                     messageHeaderDecoder.version());
 
                 agent.onSessionClose(
+                    closeEventDecoder.leadershipTermId(),
+                    header.position(),
                     closeEventDecoder.clusterSessionId(),
                     closeEventDecoder.timestamp(),
                     closeEventDecoder.closeReason());
@@ -153,8 +162,8 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
                     messageHeaderDecoder.version());
 
                 agent.onServiceAction(
-                    actionRequestDecoder.logPosition(),
                     actionRequestDecoder.leadershipTermId(),
+                    actionRequestDecoder.logPosition(),
                     actionRequestDecoder.timestamp(),
                     actionRequestDecoder.action());
                 break;
@@ -174,22 +183,22 @@ final class BoundedLogAdapter implements ControlledFragmentHandler, AutoCloseabl
                     newLeadershipTermEventDecoder.logSessionId());
                 break;
 
-            case ClusterChangeEventDecoder.TEMPLATE_ID:
-                clusterChangeEventDecoder.wrap(
+            case MembershipChangeEventDecoder.TEMPLATE_ID:
+                membershipChangeEventDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
                     messageHeaderDecoder.blockLength(),
                     messageHeaderDecoder.version());
 
-                agent.onClusterChange(
-                    clusterChangeEventDecoder.leadershipTermId(),
-                    clusterChangeEventDecoder.logPosition(),
-                    clusterChangeEventDecoder.timestamp(),
-                    clusterChangeEventDecoder.leaderMemberId(),
-                    clusterChangeEventDecoder.clusterSize(),
-                    clusterChangeEventDecoder.eventType(),
-                    clusterChangeEventDecoder.memberId(),
-                    clusterChangeEventDecoder.clusterMembers());
+                agent.onMembershipChange(
+                    membershipChangeEventDecoder.leadershipTermId(),
+                    membershipChangeEventDecoder.logPosition(),
+                    membershipChangeEventDecoder.timestamp(),
+                    membershipChangeEventDecoder.leaderMemberId(),
+                    membershipChangeEventDecoder.clusterSize(),
+                    membershipChangeEventDecoder.changeType(),
+                    membershipChangeEventDecoder.memberId(),
+                    membershipChangeEventDecoder.clusterMembers());
                 break;
         }
 

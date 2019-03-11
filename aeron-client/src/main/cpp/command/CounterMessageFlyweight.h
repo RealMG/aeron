@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef AERON_COUNTERMESSAGEFLYWEIGHT_H
-#define AERON_COUNTERMESSAGEFLYWEIGHT_H
+#ifndef AERON_COUNTER_MESSAGE_FLYWEIGHT_H
+#define AERON_COUNTER_MESSAGE_FLYWEIGHT_H
 
 #include <cstdint>
 #include <string>
@@ -60,8 +60,8 @@ class CounterMessageFlyweight : public CorrelatedMessageFlyweight
 public:
     typedef CounterMessageFlyweight this_t;
 
-    inline CounterMessageFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset)
-        : CorrelatedMessageFlyweight(buffer, offset), m_struct(overlayStruct<CounterMessageDefn>(0))
+    inline CounterMessageFlyweight(concurrent::AtomicBuffer& buffer, util::index_t offset) :
+        CorrelatedMessageFlyweight(buffer, offset), m_struct(overlayStruct<CounterMessageDefn>(0))
     {
     }
 
@@ -145,4 +145,4 @@ private:
 };
 
 }}
-#endif //AERON_COUNTERMESSAGEFLYWEIGHT_H
+#endif

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2014-2018 Real Logic Ltd.
+ *  Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.aeron.cluster;
 
 import io.aeron.Image;
 import io.aeron.ImageControlledFragmentAssembler;
+import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.*;
 import io.aeron.logbuffer.ControlledFragmentHandler;
 import io.aeron.logbuffer.Header;
@@ -42,7 +43,7 @@ final class LogAdapter implements ControlledFragmentHandler, AutoCloseable
     private final TimerEventDecoder timerEventDecoder = new TimerEventDecoder();
     private final ClusterActionRequestDecoder clusterActionRequestDecoder = new ClusterActionRequestDecoder();
     private final NewLeadershipTermEventDecoder newLeadershipTermEventDecoder = new NewLeadershipTermEventDecoder();
-    private final ClusterChangeEventDecoder clusterChangeEventDecoder = new ClusterChangeEventDecoder();
+    private final MembershipChangeEventDecoder membershipChangeEventDecoder = new MembershipChangeEventDecoder();
 
     LogAdapter(final Image image, final ConsensusModuleAgent consensusModuleAgent)
     {
@@ -87,8 +88,14 @@ final class LogAdapter implements ControlledFragmentHandler, AutoCloseable
     public Action onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         messageHeaderDecoder.wrap(buffer, offset);
-        final int templateId = messageHeaderDecoder.templateId();
 
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
+        final int templateId = messageHeaderDecoder.templateId();
         if (templateId == SessionHeaderDecoder.TEMPLATE_ID)
         {
             sessionHeaderDecoder.wrap(
@@ -166,22 +173,22 @@ final class LogAdapter implements ControlledFragmentHandler, AutoCloseable
                     newLeadershipTermEventDecoder.logSessionId());
                 break;
 
-            case ClusterChangeEventDecoder.TEMPLATE_ID:
-                clusterChangeEventDecoder.wrap(
+            case MembershipChangeEventDecoder.TEMPLATE_ID:
+                membershipChangeEventDecoder.wrap(
                     buffer,
                     offset + MessageHeaderDecoder.ENCODED_LENGTH,
                     messageHeaderDecoder.blockLength(),
                     messageHeaderDecoder.version());
 
-                consensusModuleAgent.onReplayClusterChange(
-                    clusterChangeEventDecoder.leadershipTermId(),
-                    clusterChangeEventDecoder.logPosition(),
-                    clusterChangeEventDecoder.timestamp(),
-                    clusterChangeEventDecoder.leaderMemberId(),
-                    clusterChangeEventDecoder.clusterSize(),
-                    clusterChangeEventDecoder.eventType(),
-                    clusterChangeEventDecoder.memberId(),
-                    clusterChangeEventDecoder.clusterMembers());
+                consensusModuleAgent.onMembershipClusterChange(
+                    membershipChangeEventDecoder.leadershipTermId(),
+                    membershipChangeEventDecoder.logPosition(),
+                    membershipChangeEventDecoder.timestamp(),
+                    membershipChangeEventDecoder.leaderMemberId(),
+                    membershipChangeEventDecoder.clusterSize(),
+                    membershipChangeEventDecoder.changeType(),
+                    membershipChangeEventDecoder.memberId(),
+                    membershipChangeEventDecoder.clusterMembers());
                 break;
 
             case ClusterActionRequestDecoder.TEMPLATE_ID:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,12 @@ class ConsensusModuleSnapshotLoader implements ControlledFragmentHandler
     public Action onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         messageHeaderDecoder.wrap(buffer, offset);
+
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
 
         final int templateId = messageHeaderDecoder.templateId();
         switch (templateId)
@@ -144,9 +150,6 @@ class ConsensusModuleSnapshotLoader implements ControlledFragmentHandler
                     clusterMembersDecoder.highMemberId(),
                     clusterMembersDecoder.clusterMembers());
                 break;
-
-            default:
-                throw new ClusterException("unknown template id: " + templateId);
         }
 
         return ControlledFragmentHandler.Action.CONTINUE;

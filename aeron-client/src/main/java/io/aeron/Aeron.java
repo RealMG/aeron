@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -201,8 +201,6 @@ public class Aeron implements AutoCloseable
      * <p>
      * This will close all currently open {@link Publication}s, {@link Subscription}s, and {@link Counter}s created
      * from this client.
-     * @throws AeronException if the client conductor does not close cleanly. If this happens then
-     * {@link Context#close()} will not be called so that the CnC file is not unmapped to avoid segfaults.
      */
     public void close()
     {
@@ -211,21 +209,11 @@ public class Aeron implements AutoCloseable
             if (null != conductorRunner)
             {
                 conductorRunner.close();
-                if (!conductorRunner.isClosed())
-                {
-                    throw new AeronException("failed to close Aeron client");
-                }
             }
             else
             {
                 conductorInvoker.close();
-                if (!conductorInvoker.isClosed())
-                {
-                    throw new AeronException("failed to close Aeron client");
-                }
             }
-
-            ctx.close();
         }
     }
 
@@ -445,6 +433,9 @@ public class Aeron implements AutoCloseable
      * A number of the properties are for testing and should not be set by end users.
      * <p>
      * <b>Note:</b> Do not reuse instances of the context across different {@link Aeron} clients.
+     * <p>
+     * The context will be owned by {@link ClientConductor} after a successful
+     * {@link Aeron#connect(Context)} and closed via {@link Aeron#close()}.
      */
     public static class Context extends CommonContext
     {
@@ -658,9 +649,9 @@ public class Aeron implements AutoCloseable
         }
 
         /**
-         * Get the {@link java.time.Clock} used by the client for the epoch time in milliseconds.
+         * Get the {@link EpochClock} used by the client for the epoch time in milliseconds.
          *
-         * @return the {@link java.time.Clock} used by the client for the epoch time in milliseconds.
+         * @return the {@link EpochClock} used by the client for the epoch time in milliseconds.
          */
         public EpochClock epochClock()
         {
@@ -1044,8 +1035,9 @@ public class Aeron implements AutoCloseable
          */
         public void close()
         {
+            final MappedByteBuffer cncByteBuffer = this.cncByteBuffer;
+            this.cncByteBuffer = null;
             IoUtil.unmap(cncByteBuffer);
-            cncByteBuffer = null;
             super.close();
         }
 

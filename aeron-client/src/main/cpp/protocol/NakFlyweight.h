@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_COMMAND_NAKFLYWEIGHT__
-#define INCLUDED_AERON_COMMAND_NAKFLYWEIGHT__
+#ifndef AERON_NAK_FLYWEIGHT_H
+#define AERON_NAK_FLYWEIGHT_H
 
 #include <cstdint>
 #include <string>
@@ -122,4 +122,4 @@ private:
 
 }}
 
-#endif //INCLUDED_AERON_COMMAND_NAKFLYWEIGHT__
+#endif

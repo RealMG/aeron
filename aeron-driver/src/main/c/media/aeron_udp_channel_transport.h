@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_UDP_CHANNEL_TRANSPORT_H
-#define AERON_AERON_UDP_CHANNEL_TRANSPORT_H
+#ifndef AERON_UDP_CHANNEL_TRANSPORT_H
+#define AERON_UDP_CHANNEL_TRANSPORT_H
 
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "aeron_socket.h"
 
 #include "aeron_driver_common.h"
-
-typedef int aeron_fd_t;
 
 typedef struct aeron_udp_channel_transport_stct
 {
@@ -64,4 +61,4 @@ int aeron_udp_channel_transport_sendmsg(
 
 int aeron_udp_channel_transport_get_so_rcvbuf(aeron_udp_channel_transport_t *transport, size_t *so_rcvbuf);
 
-#endif //AERON_AERON_UDP_CHANNEL_TRANSPORT_H
+#endif //AERON_UDP_CHANNEL_TRANSPORT_H

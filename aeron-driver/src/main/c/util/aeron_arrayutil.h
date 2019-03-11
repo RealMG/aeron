@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_ARRAYUTIL_H
-#define AERON_AERON_ARRAYUTIL_H
+#ifndef AERON_ARRAYUTIL_H
+#define AERON_ARRAYUTIL_H
+
+#include "aeron_platform.h"
+
+#if  defined(AERON_COMPILER_MSVC) && defined(AERON_CPU_X64)
+#define restrict __restrict
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
@@ -84,4 +90,4 @@ inline int aeron_array_remove(
     return 0;
 }
 
-#endif //AERON_AERON_ARRAYUTIL_H
+#endif //AERON_ARRAYUTIL_H

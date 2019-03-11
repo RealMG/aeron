@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@
 package io.aeron.cluster.service;
 
 import io.aeron.Subscription;
+import io.aeron.cluster.client.ClusterException;
+import io.aeron.cluster.codecs.ElectionStartEventDecoder;
 import io.aeron.cluster.codecs.JoinLogDecoder;
 import io.aeron.cluster.codecs.MessageHeaderDecoder;
+import io.aeron.cluster.codecs.ServiceTerminationPositionDecoder;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
 import org.agrona.CloseHelper;
@@ -30,6 +33,9 @@ final class ServiceAdapter implements FragmentHandler, AutoCloseable
 
     private final MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
     private final JoinLogDecoder joinLogDecoder = new JoinLogDecoder();
+    private final ServiceTerminationPositionDecoder serviceTerminationPositionDecoder =
+        new ServiceTerminationPositionDecoder();
+    private final ElectionStartEventDecoder electionStartEventDecoder = new ElectionStartEventDecoder();
 
     ServiceAdapter(final Subscription subscription, final ClusteredServiceAgent clusteredServiceAgent)
     {
@@ -51,23 +57,51 @@ final class ServiceAdapter implements FragmentHandler, AutoCloseable
     {
         messageHeaderDecoder.wrap(buffer, offset);
 
-        final int templateId = messageHeaderDecoder.templateId();
-        if (JoinLogDecoder.TEMPLATE_ID == templateId)
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
         {
-            joinLogDecoder.wrap(
-                buffer,
-                offset + MessageHeaderDecoder.ENCODED_LENGTH,
-                messageHeaderDecoder.blockLength(),
-                messageHeaderDecoder.version());
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
 
-            clusteredServiceAgent.onJoinLog(
-                joinLogDecoder.leadershipTermId(),
-                joinLogDecoder.logPosition(),
-                joinLogDecoder.maxLogPosition(),
-                joinLogDecoder.memberId(),
-                joinLogDecoder.logSessionId(),
-                joinLogDecoder.logStreamId(),
-                joinLogDecoder.logChannel());
+        final int templateId = messageHeaderDecoder.templateId();
+        switch (templateId)
+        {
+            case JoinLogDecoder.TEMPLATE_ID:
+                joinLogDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    messageHeaderDecoder.blockLength(),
+                    messageHeaderDecoder.version());
+
+                clusteredServiceAgent.onJoinLog(
+                    joinLogDecoder.leadershipTermId(),
+                    joinLogDecoder.logPosition(),
+                    joinLogDecoder.maxLogPosition(),
+                    joinLogDecoder.memberId(),
+                    joinLogDecoder.logSessionId(),
+                    joinLogDecoder.logStreamId(),
+                    joinLogDecoder.logChannel());
+                break;
+
+            case ServiceTerminationPositionDecoder.TEMPLATE_ID:
+                serviceTerminationPositionDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    messageHeaderDecoder.blockLength(),
+                    messageHeaderDecoder.version());
+
+                clusteredServiceAgent.onServiceTerminationPosition(serviceTerminationPositionDecoder.logPosition());
+                break;
+
+            case ElectionStartEventDecoder.TEMPLATE_ID:
+                electionStartEventDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    messageHeaderDecoder.blockLength(),
+                    messageHeaderDecoder.version());
+
+                clusteredServiceAgent.onElectionStartEvent(electionStartEventDecoder.logPosition());
+                break;
         }
     }
 }

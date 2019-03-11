@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -323,6 +323,7 @@ public class Image
         int resultingOffset = initialOffset;
         final UnsafeBuffer termBuffer = activeTermBuffer(initialPosition);
         final int capacity = termBuffer.capacity();
+        final Header header = this.header;
         header.buffer(termBuffer);
 
         try
@@ -413,6 +414,7 @@ public class Image
         int resultingOffset = initialOffset;
         final UnsafeBuffer termBuffer = activeTermBuffer(initialPosition);
         final int endOffset = (int)Math.min(termBuffer.capacity(), maxPosition - initialPosition + initialOffset);
+        final Header header = this.header;
         header.buffer(termBuffer);
 
         try
@@ -504,6 +506,7 @@ public class Image
         long position = initialPosition;
         final UnsafeBuffer termBuffer = activeTermBuffer(initialPosition);
         final int capacity = termBuffer.capacity();
+        final Header header = this.header;
         header.buffer(termBuffer);
         long resultingPosition = initialPosition;
 
@@ -698,5 +701,19 @@ public class Image
         finalPosition = subscriberPosition.getVolatile();
         isEos = finalPosition >= endOfStreamPosition(logBuffers.metaDataBuffer());
         isClosed = true;
+    }
+
+    public String toString()
+    {
+        return "Image{" +
+            "correlationId=" + correlationId +
+            ", joinPosition=" + joinPosition +
+            ", sessionId=" + sessionId +
+            ", initialTermId=" + initialTermId +
+            ", isEos=" + isEos +
+            ", sourceIdentity='" + sourceIdentity + '\'' +
+            ", subscription=" + subscription +
+            ", position=" + position() +
+            '}';
     }
 }

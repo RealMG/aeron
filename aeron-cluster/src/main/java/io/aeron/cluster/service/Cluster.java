@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@ package io.aeron.cluster.service;
 
 import io.aeron.Aeron;
 import io.aeron.cluster.client.ClusterException;
+import io.aeron.cluster.codecs.CloseReason;
+import io.aeron.logbuffer.Header;
+import org.agrona.DirectBuffer;
 
 import java.util.Collection;
 
@@ -116,6 +119,13 @@ public interface Cluster
     Aeron aeron();
 
     /**
+     * Get the  {@link ClusteredServiceContainer.Context} under which the container is running.
+     *
+     * @return the {@link ClusteredServiceContainer.Context} under which the container is running.
+     */
+    ClusteredServiceContainer.Context context();
+
+    /**
      * Get the {@link ClientSession} for a given cluster session id.
      *
      * @param clusterSessionId to be looked up.
@@ -151,6 +161,13 @@ public interface Cluster
      * for cancellation.
      * <p>
      * If the correlationId is for an existing scheduled timer then it will be reschedule to the new deadline.
+     * <p>
+     * Timers should only be scheduled or cancelled in the context of processing a
+     * {@link ClusteredService#onSessionMessage(ClientSession, long, DirectBuffer, int, int, Header)},
+     * {@link ClusteredService#onTimerEvent(long, long)},
+     * {@link ClusteredService#onSessionOpen(ClientSession, long)}, or
+     * {@link ClusteredService#onSessionClose(ClientSession, long, CloseReason)}.
+     * If applied to other events then they are not guaranteed to be reliable.
      *
      * @param correlationId to identify the timer when it expires.
      * @param deadlineMs Epoch time in milliseconds after which the timer will fire.
@@ -161,6 +178,13 @@ public interface Cluster
 
     /**
      * Cancel a previous scheduled timer.
+     * <p>
+     * Timers should only be scheduled or cancelled in the context of processing a
+     * {@link ClusteredService#onSessionMessage(ClientSession, long, DirectBuffer, int, int, Header)},
+     * {@link ClusteredService#onTimerEvent(long, long)},
+     * {@link ClusteredService#onSessionOpen(ClientSession, long)}, or
+     * {@link ClusteredService#onSessionClose(ClientSession, long, CloseReason)}.
+     * If applied to other events then they are not guaranteed to be reliable.
      *
      * @param correlationId for the timer provided when it was scheduled.
      * @return true if the event to cancel a scheduled timer has been sent or false if back pressure is applied.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
 
 #include <concurrent/aeron_atomic.h>
 
-extern bool aeron_cmpxchg64(volatile int64_t* destination,  int64_t expected, int64_t desired);
-extern bool aeron_cmpxchgu64(volatile uint64_t* destination,  uint64_t expected, uint64_t desired);
-extern bool aeron_cmpxchg32(volatile int32_t* destination,  int32_t expected, int32_t desired);
+extern bool aeron_cmpxchg64(volatile int64_t* destination, int64_t expected, int64_t desired);
+
+extern bool aeron_cmpxchgu64(volatile uint64_t* destination, uint64_t expected, uint64_t desired);
+
+extern bool aeron_cmpxchg32(volatile int32_t* destination, int32_t expected, int32_t desired);
+
 extern void aeron_acquire();
+
 extern void aeron_release();

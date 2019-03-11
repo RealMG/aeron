@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_SUBSCRIPTION__
-#define INCLUDED_AERON_SUBSCRIPTION__
+#ifndef AERON_SUBSCRIPTION_H
+#define AERON_SUBSCRIPTION_H
 
 #include <cstdint>
 #include <iostream>
 #include <atomic>
+#include <memory>
 #include <concurrent/logbuffer/TermReader.h>
 #include "concurrent/status/StatusIndicatorReader.h"
 #include "Image.h"
@@ -56,7 +57,7 @@ public:
         std::int32_t streamId,
         std::int32_t channelStatusId);
     /// @endcond
-    virtual ~Subscription();
+    ~Subscription();
 
     /**
      * Media address for delivery to the channel.
@@ -111,32 +112,6 @@ public:
      * @param endpointChannel for the destination to remove.
      */
     void removeDestination(const std::string& endpointChannel);
-
-    /**
-     * Poll the Image s under the subscription for having reached End of Stream.
-     *
-     * @param endOfStreamHandler callback for handling end of stream indication.
-     * @return number of Image s that have reached End of Stream.
-     */
-    template <typename F>
-    inline int pollEndOfStreams(F&& endOfStreamHandler) const
-    {
-        const struct ImageList *imageList = std::atomic_load_explicit(&m_imageList, std::memory_order_acquire);
-        const std::size_t length = imageList->m_length;
-        Image *images = imageList->m_images;
-        int numEndOfStreams = 0;
-
-        for (std::size_t i = 0; i < length; i++)
-        {
-            if (images[i].isEndOfStream())
-            {
-                numEndOfStreams++;
-                endOfStreamHandler(images[i]);
-            }
-        }
-
-        return numEndOfStreams;
-    }
 
     /**
      * Poll the {@link Image}s under the subscription for available message fragments.
@@ -299,7 +274,7 @@ public:
             }
         }
 
-        return (index != -1) ? std::shared_ptr<Image>(new Image(images[index])) : std::shared_ptr<Image>();
+        return index != -1 ? std::make_shared<Image>(images[index]) : std::shared_ptr<Image>();
     }
 
     /**
@@ -310,7 +285,7 @@ public:
      * @param index in the array
      * @return image at given index or exception if out of range.
      */
-    inline Image& imageAtIndex(size_t index) const
+    inline Image& imageAtIndex(size_t index)
     {
         const struct ImageList *imageList = std::atomic_load_explicit(&m_imageList, std::memory_order_acquire);
         Image *images = imageList->m_images;
@@ -406,7 +381,6 @@ public:
         newArray[length] = image; // copy-assign
 
         auto newImageList = new struct ImageList(newArray, length + 1);
-
         std::atomic_store_explicit(&m_imageList, newImageList, std::memory_order_release);
 
         return oldImageList;
@@ -441,14 +415,11 @@ public:
                 }
             }
 
-            auto newImageList = new struct ImageList(newArray, length - 1);
-
+            auto newImageList = new struct ImageList(newArray, static_cast<size_t>(length - 1));
             std::atomic_store_explicit(&m_imageList, newImageList, std::memory_order_release);
         }
 
-        return std::pair<struct ImageList *, int>(
-                (-1 != index) ? oldImageList : nullptr,
-                index);
+        return std::pair<struct ImageList *, int>(-1 != index ? oldImageList : nullptr, index);
     }
 
     struct ImageList *removeAndCloseAllImages()

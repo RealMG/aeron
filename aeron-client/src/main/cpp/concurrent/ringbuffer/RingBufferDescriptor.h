@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_RINGBUFFER_RING_BUFFER_DESCRIPTOR__
-#define INCLUDED_AERON_CONCURRENT_RINGBUFFER_RING_BUFFER_DESCRIPTOR__
+#ifndef AERON_RING_BUFFER_DESCRIPTOR_H
+#define AERON_RING_BUFFER_DESCRIPTOR_H
 
 #include <functional>
 #include <util/Index.h>
@@ -46,7 +46,8 @@ namespace RingBufferDescriptor {
         if (!util::BitUtil::isPowerOfTwo(capacity))
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=%d", capacity), SOURCEINFO);
+                "Capacity must be a positive power of 2 + TRAILER_LENGTH: capacity=" + std::to_string(capacity),
+                SOURCEINFO);
         }
     }
 }

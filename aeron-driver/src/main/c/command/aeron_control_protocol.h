@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_CONTROL_PROTOCOL_H
-#define AERON_AERON_CONTROL_PROTOCOL_H
+#ifndef AERON_CONTROL_PROTOCOL_H
+#define AERON_CONTROL_PROTOCOL_H
 
 #include <stdint.h>
 
@@ -41,6 +41,7 @@
 #define AERON_RESPONSE_ON_SUBSCRIPTION_READY (0x0F07)
 #define AERON_RESPONSE_ON_COUNTER_READY (0x0F08)
 #define AERON_RESPONSE_ON_UNAVAILABLE_COUNTER (0x0F09)
+#define AERON_RESPONSE_ON_CLIENT_TIMEOUT (0x0F0A)
 
 /* error codes */
 #define AERON_ERROR_CODE_GENERIC_ERROR (0)
@@ -160,6 +161,12 @@ typedef struct aeron_counter_update_stct
 }
 aeron_counter_update_t;
 
+typedef struct aeron_client_timeout_stct
+{
+    int64_t client_id;
+}
+aeron_client_timeout_t;
+
 #pragma pack(pop)
 
-#endif //AERON_AERON_CONTROL_PROTOCOL_H
+#endif //AERON_CONTROL_PROTOCOL_H

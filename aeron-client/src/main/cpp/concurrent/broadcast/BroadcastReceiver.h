@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_BROADCAST_RECEIVER__
-#define INCLUDED_AERON_CONCURRENT_BROADCAST_RECEIVER__
+#ifndef AERON_CONCURRENT_BROADCAST_RECEIVER_H
+#define AERON_CONCURRENT_BROADCAST_RECEIVER_H
 
 #include <atomic>
 #include <util/Index.h>
@@ -41,6 +41,10 @@ public:
         m_lappedCount(0)
     {
         BroadcastBufferDescriptor::checkCapacity(m_capacity);
+
+        m_cursor = m_buffer.getInt64(m_latestCounterIndex);
+        m_nextRecord = m_cursor;
+        m_recordOffset = (std::int32_t)m_cursor & m_mask;
     }
 
     inline util::index_t capacity() const
@@ -98,8 +102,8 @@ public:
             {
                 recordOffset = 0;
                 m_cursor = m_nextRecord;
-                m_nextRecord += util::BitUtil::align(
-                    m_buffer.getInt32(RecordDescriptor::lengthOffset(recordOffset)), RecordDescriptor::RECORD_ALIGNMENT);
+                m_nextRecord += util::BitUtil::align(m_buffer.getInt32(
+                    RecordDescriptor::lengthOffset(recordOffset)), RecordDescriptor::RECORD_ALIGNMENT);
             }
 
             m_recordOffset = recordOffset;

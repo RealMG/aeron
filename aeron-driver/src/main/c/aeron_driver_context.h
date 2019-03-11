@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 - 2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_DRIVER_CONTEXT_H
-#define AERON_AERON_DRIVER_CONTEXT_H
+#ifndef AERON_DRIVER_CONTEXT_H
+#define AERON_DRIVER_CONTEXT_H
 
 #include "aeron_driver_common.h"
 #include "aeronmd.h"
@@ -30,7 +30,7 @@
 
 #define AERON_CNC_FILE "cnc.dat"
 #define AERON_LOSS_REPORT_FILE "loss-report.dat"
-#define AERON_CNC_VERSION (14)
+#define AERON_CNC_VERSION (15)
 
 #pragma pack(push)
 #pragma pack(4)
@@ -60,8 +60,8 @@ typedef struct aeron_driver_sender_proxy_stct aeron_driver_sender_proxy_t;
 typedef struct aeron_driver_receiver_proxy_stct aeron_driver_receiver_proxy_t;
 
 typedef aeron_rb_handler_t aeron_driver_conductor_to_driver_interceptor_func_t;
-typedef void (*aeron_driver_conductor_to_client_interceptor_func_t)
-    (aeron_driver_conductor_t *conductor, int32_t msg_type_id, const void *message, size_t length);
+typedef void (*aeron_driver_conductor_to_client_interceptor_func_t)(
+    aeron_driver_conductor_t *conductor, int32_t msg_type_id, const void *message, size_t length);
 
 typedef enum aeron_threading_mode_enum
 {
@@ -76,11 +76,11 @@ typedef struct aeron_driver_context_stct
     char *aeron_dir;                            /* aeron.dir */
     aeron_threading_mode_t threading_mode;      /* aeron.threading.mode = DEDICATED */
     bool dirs_delete_on_start;                  /* aeron.dir.delete.on.start = false */
-    bool warn_if_dirs_exist;
+    bool warn_if_dirs_exist;                    /* aeron.dir.warn.if.exists = true */
     bool term_buffer_sparse_file;               /* aeron.term.buffer.sparse.file = false */
     bool perform_storage_checks;                /* aeron.perform.storage.checks = true */
     bool spies_simulate_connection;             /* aeron.spies.simulate.connection = false */
-    uint64_t driver_timeout_ms;
+    uint64_t driver_timeout_ms;                 /* aeron.driver.timeout = 10s */
     uint64_t client_liveness_timeout_ns;        /* aeron.client.liveness.timeout = 5s */
     uint64_t publication_linger_timeout_ns;     /* aeron.publication.linger.timeout = 5s */
     uint64_t status_message_timeout_ns;         /* aeron.rcv.status.message.timeout = 200ms */
@@ -92,10 +92,10 @@ typedef struct aeron_driver_context_stct
     size_t to_driver_buffer_length;             /* aeron.conductor.buffer.length = 1MB + trailer*/
     size_t to_clients_buffer_length;            /* aeron.clients.buffer.length = 1MB + trailer */
     size_t counters_values_buffer_length;       /* aeron.counters.buffer.length = 1MB */
-    size_t counters_metadata_buffer_length;     /* = 2x values */
+    size_t counters_metadata_buffer_length;     /* counters value length times the ratio of metadata to values record */
     size_t error_buffer_length;                 /* aeron.error.buffer.length = 1MB */
-    size_t term_buffer_length;                  /* aeron.term.buffer.length = 16 * 1024 * 1024 */
-    size_t ipc_term_buffer_length;              /* aeron.ipc.term.buffer.length = 64 * 1024 * 1024 */
+    size_t term_buffer_length;                  /* aeron.term.buffer.length = 16MB */
+    size_t ipc_term_buffer_length;              /* aeron.ipc.term.buffer.length = 64MB */
     size_t mtu_length;                          /* aeron.mtu.length = 1408 */
     size_t ipc_mtu_length;                      /* aeron.ipc.mtu.length = 1408 */
     size_t ipc_publication_window_length;       /* aeron.ipc.publication.term.window.length = 0 */
@@ -231,9 +231,8 @@ inline size_t aeron_ipc_publication_term_window_length(aeron_driver_context_t *c
 
     if (0 != context->ipc_publication_window_length)
     {
-        publication_term_window_length = (publication_term_window_length < context->ipc_publication_window_length) ?
-            publication_term_window_length :
-            context->ipc_publication_window_length;
+        publication_term_window_length = publication_term_window_length < context->ipc_publication_window_length ?
+            publication_term_window_length : context->ipc_publication_window_length;
     }
 
     return publication_term_window_length;
@@ -245,12 +244,11 @@ inline size_t aeron_network_publication_term_window_length(aeron_driver_context_
 
     if (0 != context->publication_window_length)
     {
-        publication_term_window_length = (publication_term_window_length < context->publication_window_length) ?
-            publication_term_window_length :
-            context->publication_window_length;
+        publication_term_window_length = publication_term_window_length < context->publication_window_length ?
+            publication_term_window_length : context->publication_window_length;
     }
 
     return publication_term_window_length;
 }
 
-#endif //AERON_AERON_DRIVER_CONTEXT_H
+#endif //AERON_DRIVER_CONTEXT_H

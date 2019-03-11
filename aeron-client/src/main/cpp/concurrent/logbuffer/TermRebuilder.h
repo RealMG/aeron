@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERMREBUILDER__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERMREBUILDER__
+#ifndef AERON_CONCURRENT_LOGBUFFER_TERM_REBUILDER_H
+#define AERON_CONCURRENT_LOGBUFFER_TERM_REBUILDER_H
 
 #include "FrameDescriptor.h"
 
@@ -38,4 +38,4 @@ inline void insert(AtomicBuffer& termBuffer, std::int32_t termOffset, AtomicBuff
 }
 
 }}}
-#endif //AERON_TERMREBUILDER_H
+#endif

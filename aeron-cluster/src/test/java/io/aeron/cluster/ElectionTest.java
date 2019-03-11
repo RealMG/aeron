@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,7 @@ public class ElectionTest
             leadershipTermId,
             logPosition,
             candidateTermId,
+            logPosition,
             candidateMember.id(),
             logSessionId);
         verify(memberStatusPublisher).newLeadershipTerm(
@@ -178,6 +179,7 @@ public class ElectionTest
             leadershipTermId,
             logPosition,
             candidateTermId,
+            logPosition,
             candidateMember.id(),
             logSessionId);
         assertThat(election.state(), is(Election.State.LEADER_READY));
@@ -230,7 +232,8 @@ public class ElectionTest
         assertThat(election.state(), is(Election.State.FOLLOWER_BALLOT));
 
         final int logSessionId = -7;
-        election.onNewLeadershipTerm(leadershipTermId, logPosition, candidateTermId, candidateId, logSessionId);
+        election.onNewLeadershipTerm(
+            leadershipTermId, logPosition, candidateTermId, logPosition, candidateId, logSessionId);
         assertThat(election.state(), is(Election.State.FOLLOWER_REPLAY));
 
         when(consensusModuleAgent.createAndRecordLogSubscriptionAsFollower(anyString()))
@@ -238,7 +241,6 @@ public class ElectionTest
         when(memberStatusPublisher.catchupPosition(any(), anyLong(), anyLong(), anyInt())).thenReturn(Boolean.TRUE);
         when(consensusModuleAgent.hasAppendReachedLivePosition(any(), anyInt(), anyLong())).thenReturn(Boolean.TRUE);
         when(consensusModuleAgent.hasAppendReachedPosition(any(), anyInt(), anyLong())).thenReturn(Boolean.TRUE);
-        when(memberStatusPublisher.stopCatchup(any(), anyInt(), anyInt())).thenReturn(Boolean.TRUE);
         final long t3 = 3;
         election.doWork(t3);
         election.doWork(t3);
@@ -599,7 +601,7 @@ public class ElectionTest
         final long t1 = 1;
         election.doWork(t1);
         assertThat(election.state(), is(Election.State.CANVASS));
-        verify(consensusModuleAgent).prepareForElection(logPosition);
+        verify(consensusModuleAgent).prepareForNewLeadership(logPosition);
         verify(consensusModuleAgent).role(Cluster.Role.FOLLOWER);
     }
 

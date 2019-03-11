@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 package io.aeron.cluster;
 
 import io.aeron.Aeron;
-import io.aeron.ChannelUri;
-import io.aeron.CommonContext;
 import io.aeron.Publication;
 import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.codecs.CloseReason;
@@ -37,7 +35,7 @@ class ClusterSession
 
     enum State
     {
-        INIT, CONNECTED, CHALLENGED, AUTHENTICATED, REJECTED, OPEN, CLOSED
+        INIT, CONNECTED, CHALLENGED, AUTHENTICATED, REJECTED, INVALID_VERSION, OPEN, CLOSED
     }
 
     private boolean hasNewLeaderEventPending = false;
@@ -126,13 +124,9 @@ class ClusterSession
             throw new ClusterException("response publication already added");
         }
 
-        final ChannelUri channelUri = ChannelUri.parse(responseChannel);
-        channelUri.put(CommonContext.TERM_LENGTH_PARAM_NAME, "64k");
-        channelUri.put(CommonContext.SPARSE_PARAM_NAME, "true");
-
         try
         {
-            responsePublication = aeron.addExclusivePublication(channelUri.toString(), responseStreamId);
+            responsePublication = aeron.addPublication(responseChannel, responseStreamId);
         }
         catch (final InvalidChannelException ignore)
         {

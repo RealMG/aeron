@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
                    package="io.aeron.cluster.codecs"
-                   id="1"
-                   version="1"
+                   id="111"
+                   version="2"
                    semanticVersion="5.2"
                    description="Message Codecs for communicating with, and within, an Aeron Cluster"
                    byteOrder="littleEndian">
@@ -40,12 +40,10 @@
             <validValue name="SERVICE_ACTION">1</validValue>
             <validValue name="TIMEOUT">2</validValue>
         </enum>
-        <enum name="ClusterAction" encodingType="int32" description="Action to be taken by a cluster nodes">
+        <enum name="ClusterAction" encodingType="int32" description="Action to be taken by cluster nodes">
             <validValue name="SUSPEND">0</validValue>
             <validValue name="RESUME">1</validValue>
             <validValue name="SNAPSHOT">2</validValue>
-            <validValue name="SHUTDOWN">3</validValue>
-            <validValue name="ABORT">4</validValue>
         </enum>
         <enum name="SnapshotMark" encodingType="int32" description="Mark within a snapshot">
             <validValue name="BEGIN">0</validValue>
@@ -54,19 +52,21 @@
         </enum>
         <enum name="ChangeType" encodingType="int32" description="Type of Cluster Change Event">
             <validValue name="JOIN">0</validValue>
-            <validValue name="LEAVE">1</validValue>
+            <validValue name="QUIT">1</validValue>
         </enum>
         <type name="time_t" primitiveType="int64" description="Epoch time in milliseconds since 1 Jan 1970 UTC"/>
+        <type name="version_t" primitiveType="int32" presence="optional" nullValue="0" minValue="2" maxValue="16777215"
+              sinceVersion="2" description="Protocol suite version"/>
     </types>
 
     <!--
         Cluster Session Protocol
         ========================
 
-        Protocol is:
-            -> session-connect, [*ingress-message | *session-keep-alive], session-close
+        Session Protocol:
+            -> session-connect, *[ingress-message | session-keep-alive], session-close
                       \
-            <-          *session-event, [*egress-message | *session-event | *new-leader-event]
+            <-          +session-event, *[session-event | egress-message | new-leader-event]
 
         1. Session Connect
           - An attempt is made to establish a connection with the cluster via multicast or multi-destination-cast.
@@ -151,8 +151,9 @@
                  description="Connect to the cluster and if successful then open a session">
         <field name="correlationId"        id="1" type="int64"/>
         <field name="responseStreamId"     id="2" type="int32"/>
-        <data  name="responseChannel"      id="3" type="varAsciiEncoding"/>
-        <data  name="encodedCredentials"   id="4" type="varDataEncoding"/>
+        <field name="version"              id="3" type="version_t" presence="optional" sinceVersion="2"/>
+        <data  name="responseChannel"      id="4" type="varAsciiEncoding"/>
+        <data  name="encodedCredentials"   id="5" type="varDataEncoding"/>
     </sbe:message>
 
     <sbe:message name="SessionCloseRequest"
@@ -252,17 +253,17 @@
         <field name="logSessionId"         id="5" type="int32"/>
     </sbe:message>
 
-    <sbe:message name="ClusterChangeEvent"
+    <sbe:message name="MembershipChangeEvent"
                  id="26"
-                 description="Event for the change of the cluster list that affects the size">
+                 description="Event for the change of the cluster membership that affects the cluster size">
         <field name="leadershipTermId"     id="1" type="int64"/>
         <field name="logPosition"          id="2" type="int64"/>
         <field name="timestamp"            id="3" type="time_t"/>
         <field name="leaderMemberId"       id="4" type="int32"/>
         <field name="clusterSize"          id="5" type="int32"/>
-        <field name="eventType"            id="6" type="ChangeType"/>
+        <field name="changeType"           id="6" type="ChangeType"/>
         <field name="memberId"             id="7" type="int32"/>
-        <data name="clusterMembers"        id="8" type="varAsciiEncoding"/>
+        <data  name="clusterMembers"       id="8" type="varAsciiEncoding"/>
     </sbe:message>
 
     <!-- Messages for service control between clustered services and the Consensus Module -->
@@ -330,6 +331,18 @@
         <data name="passiveFollowers"      id="4" type="varAsciiEncoding"/>
     </sbe:message>
 
+    <sbe:message name="ServiceTerminationPosition"
+                 id="42"
+                 description="Consensus Module instructing a service to terminate at a given position">
+        <field name="logPosition"          id="1" type="int64"/>
+    </sbe:message>
+
+    <sbe:message name="ElectionStartEvent"
+                 id="43"
+                 description="Consensus Module instructing a service that an election has been entered at position">
+        <field name="logPosition"          id="1" type="int64"/>
+    </sbe:message>
+
     <!--
         Cluster Consensus Protocol
         ==========================
@@ -383,8 +396,9 @@
         <field name="logLeadershipTermId"  id="1" type="int64"/>
         <field name="logPosition"          id="2" type="int64"/>
         <field name="leadershipTermId"     id="3" type="int64"/>
-        <field name="leaderMemberId"       id="4" type="int32"/>
-        <field name="logSessionId"         id="5" type="int32"/>
+        <field name="maxLogPosition"       id="4" type="int64"/>
+        <field name="leaderMemberId"       id="5" type="int32"/>
+        <field name="logSessionId"         id="6" type="int32"/>
     </sbe:message>
 
     <!-- keep this under 32 - 8 = 24 bytes for efficiency -->
@@ -415,9 +429,10 @@
 
     <sbe:message name="StopCatchup"
                  id="57"
-                 description="The follower requests to stop any active catchup replay to the follower">
-        <field name="replaySessionId"      id="1" type="int32"/>
-        <field name="followerMemberId"     id="2" type="int32"/>
+                 description="The leader informs the follower it can stop the catchup process">
+        <field name="leadershipTermId"     id="1" type="int64"/>
+        <field name="logPosition"          id="2" type="int64"/>
+        <field name="followerMemberId"     id="3" type="int32"/>
     </sbe:message>
 
     <sbe:message name="AddPassiveMember"
@@ -465,7 +480,20 @@
         <field name="memberId"                 id="2" type="int32"/>
     </sbe:message>
 
-    <!-- Serialisation of major Entities -->
+    <sbe:message name="TerminationPosition"
+                 id="75"
+                 description="Leader instructs members to terminate at given position">
+        <field name="logPosition"              id="1" type="int64"/>
+    </sbe:message>
+
+    <sbe:message name="TerminationAck"
+                 id="76"
+                 description="Follower acknowledges that it has reached termination position">
+        <field name="logPosition"              id="1" type="int64"/>
+        <field name="memberId"                 id="2" type="int32"/>
+    </sbe:message>
+
+    <!-- Serialisation of major entities -->
 
     <sbe:message name="SnapshotMarker"
                  id="100"

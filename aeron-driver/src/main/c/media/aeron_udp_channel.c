@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 #include <string.h>
 #include <errno.h>
-#include <netdb.h>
+#include "aeron_socket.h"
 #include <stdio.h>
 #include "aeron_alloc.h"
 #include "util/aeron_strutil.h"
@@ -73,11 +73,13 @@ int aeron_multicast_control_address(struct sockaddr_storage *data_addr, struct s
 {
     if (AF_INET6 == data_addr->ss_family)
     {
-        return aeron_ipv6_multicast_control_address((struct sockaddr_in6 *)data_addr, (struct sockaddr_in6 *)control_addr);
+        return aeron_ipv6_multicast_control_address(
+            (struct sockaddr_in6 *)data_addr, (struct sockaddr_in6 *)control_addr);
     }
     else if (AF_INET == data_addr->ss_family)
     {
-        return aeron_ipv4_multicast_control_address((struct sockaddr_in *)data_addr, (struct sockaddr_in *)control_addr);
+        return aeron_ipv4_multicast_control_address(
+            (struct sockaddr_in *)data_addr, (struct sockaddr_in *)control_addr);
     }
 
     aeron_set_err(EINVAL, "unknown address family: %d", data_addr->ss_family);
@@ -87,9 +89,9 @@ int aeron_multicast_control_address(struct sockaddr_storage *data_addr, struct s
 int aeron_find_multicast_interface(
     int family, const char *interface_str, struct sockaddr_storage *interface_addr, unsigned int *interface_index)
 {
-    char *wildcard_str = (AF_INET6 == family) ? "[0::]/0" : "0.0.0.0/0";
+    char *wildcard_str = AF_INET6 == family ? "[0::]/0" : "0.0.0.0/0";
 
-    return aeron_find_interface((NULL == interface_str) ? wildcard_str : interface_str, interface_addr, interface_index);
+    return aeron_find_interface(NULL == interface_str ? wildcard_str : interface_str, interface_addr, interface_index);
 }
 
 int aeron_find_unicast_interface(
@@ -129,7 +131,7 @@ int aeron_find_unicast_interface(
     return 0;
 }
 
-int aeron_uri_udp_canonicalize(
+int aeron_uri_udp_canonicalise(
     char *canonical_form, size_t length, struct sockaddr_storage *local_data, struct sockaddr_storage *remote_data)
 {
     char local_data_str[AERON_FORMAT_HEX_LENGTH(sizeof(struct sockaddr_in6))];
@@ -177,7 +179,7 @@ int aeron_uri_udp_canonicalize(
         canonical_form, length, "UDP-%s-%d-%s-%d", local_data_str, local_data_port, remote_data_str, remote_data_port);
 }
 
-int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channel_t **channel)
+int aeron_udp_channel_parse(size_t uri_length, const char *uri, aeron_udp_channel_t **channel)
 {
     aeron_udp_channel_t *_channel = NULL;
     struct sockaddr_storage endpoint_addr, explicit_control_addr, interface_addr;
@@ -193,13 +195,18 @@ int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channe
         return -1;
     }
 
-    if (aeron_uri_parse(uri, &_channel->uri) < 0)
+    if (aeron_uri_parse(uri_length, uri, &_channel->uri) < 0)
     {
         goto error_cleanup;
     }
 
-    strncpy(_channel->original_uri, uri, sizeof(_channel->original_uri));
-    _channel->uri_length = uri_length;
+    size_t copy_length = sizeof(_channel->original_uri) - 1;
+    copy_length = uri_length < copy_length ? uri_length : copy_length;
+
+    memcpy(_channel->original_uri, uri, copy_length);
+    _channel->original_uri[copy_length] = '\0';
+    _channel->uri_length = copy_length;
+
     _channel->explicit_control = false;
     _channel->multicast = false;
 
@@ -265,7 +272,7 @@ int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channe
         _channel->multicast_ttl = aeron_uri_multicast_ttl(&_channel->uri);
         memcpy(&_channel->local_data, &interface_addr, AERON_ADDR_LEN(&interface_addr));
         memcpy(&_channel->local_control, &interface_addr, AERON_ADDR_LEN(&interface_addr));
-        aeron_uri_udp_canonicalize(
+        aeron_uri_udp_canonicalise(
             _channel->canonical_form, sizeof(_channel->canonical_form), &interface_addr, &endpoint_addr);
         _channel->canonical_length = strlen(_channel->canonical_form);
         _channel->multicast = true;
@@ -278,7 +285,7 @@ int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channe
         memcpy(&_channel->remote_control, &endpoint_addr, AERON_ADDR_LEN(&endpoint_addr));
         memcpy(&_channel->local_data, &explicit_control_addr, AERON_ADDR_LEN(&explicit_control_addr));
         memcpy(&_channel->local_control, &explicit_control_addr, AERON_ADDR_LEN(&explicit_control_addr));
-        aeron_uri_udp_canonicalize(
+        aeron_uri_udp_canonicalise(
             _channel->canonical_form, sizeof(_channel->canonical_form), &explicit_control_addr, &endpoint_addr);
         _channel->canonical_length = strlen(_channel->canonical_form);
         _channel->explicit_control = true;
@@ -297,7 +304,7 @@ int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channe
         memcpy(&_channel->remote_control, &endpoint_addr, AERON_ADDR_LEN(&endpoint_addr));
         memcpy(&_channel->local_data, &interface_addr, AERON_ADDR_LEN(&interface_addr));
         memcpy(&_channel->local_control, &interface_addr, AERON_ADDR_LEN(&interface_addr));
-        aeron_uri_udp_canonicalize(
+        aeron_uri_udp_canonicalise(
             _channel->canonical_form, sizeof(_channel->canonical_form), &interface_addr, &endpoint_addr);
         _channel->canonical_length = strlen(_channel->canonical_form);
     }
@@ -306,7 +313,6 @@ int aeron_udp_channel_parse(const char *uri, size_t uri_length, aeron_udp_channe
     return 0;
 
     error_cleanup:
-
         *channel = NULL;
         if (NULL != _channel)
         {

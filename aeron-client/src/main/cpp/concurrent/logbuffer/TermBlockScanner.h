@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_TERMBLOCKSCANNER_H
-#define AERON_TERMBLOCKSCANNER_H
+#ifndef AERON_CONCURRENT_TERM_BLOCK_SCANNER_H
+#define AERON_CONCURRENT_TERM_BLOCK_SCANNER_H
 
 #include <functional>
 #include <util/Index.h>
@@ -82,4 +82,4 @@ inline std::int32_t scan(const AtomicBuffer& termBuffer, const std::int32_t term
 
 }}}
 
-#endif //AERON_TERMBLOCKSCANNER_H
+#endif

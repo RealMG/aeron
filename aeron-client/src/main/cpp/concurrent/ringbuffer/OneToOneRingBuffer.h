@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_ONETOONERINGBUFFER_H
-#define AERON_ONETOONERINGBUFFER_H
+#ifndef AERON_RING_BUFFER_ONE_TO_ONE_H
+#define AERON_RING_BUFFER_ONE_TO_ONE_H
 
 #include <limits.h>
 #include <functional>
@@ -32,8 +32,8 @@ namespace aeron { namespace concurrent { namespace ringbuffer {
 class OneToOneRingBuffer
 {
 public:
-    OneToOneRingBuffer(concurrent::AtomicBuffer &buffer)
-        : m_buffer(buffer)
+    OneToOneRingBuffer(concurrent::AtomicBuffer &buffer) :
+        m_buffer(buffer)
     {
         m_capacity = buffer.capacity() - RingBufferDescriptor::TRAILER_LENGTH;
 
@@ -237,7 +237,8 @@ private:
         if (length > m_maxMsgLength)
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("encoded message exceeds maxMsgLength of %d, length=%d", m_maxMsgLength, length),
+                "encoded message exceeds maxMsgLength of " + std::to_string(m_maxMsgLength) +
+                " length=" + std::to_string(length),
                 SOURCEINFO);
         }
     }
@@ -245,4 +246,4 @@ private:
 
 }}}
 
-#endif //AERON_ONETOONERINGBUFFER_H
+#endif

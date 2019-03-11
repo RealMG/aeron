@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_NETWORK_PUBLICATION_H
-#define AERON_AERON_NETWORK_PUBLICATION_H
+#ifndef AERON_NETWORK_PUBLICATION_H
+#define AERON_NETWORK_PUBLICATION_H
 
 #include "util/aeron_bitutil.h"
 #include "util/aeron_fileutil.h"
+#include "uri/aeron_uri.h"
 #include "aeron_driver_common.h"
 #include "aeron_driver_context.h"
 #include "concurrent/aeron_counters_manager.h"
@@ -62,8 +63,8 @@ typedef struct aeron_network_publication_stct
         (4 * AERON_CACHE_LINE_LENGTH) - sizeof(struct aeron_network_publication_conductor_fields_stct)];
 
     aeron_mapped_raw_log_t mapped_raw_log;
-    aeron_position_t pub_lmt_position;
     aeron_position_t pub_pos_position;
+    aeron_position_t pub_lmt_position;
     aeron_position_t snd_pos_position;
     aeron_position_t snd_lmt_position;
     aeron_retransmit_handler_t retransmit_handler;
@@ -115,21 +116,23 @@ int aeron_network_publication_create(
     int32_t session_id,
     int32_t stream_id,
     int32_t initial_term_id,
-    size_t mtu_length,
-    aeron_position_t *pub_lmt_position,
     aeron_position_t *pub_pos_position,
+    aeron_position_t *pub_lmt_position,
     aeron_position_t *snd_pos_position,
     aeron_position_t *snd_lmt_position,
     aeron_flow_control_strategy_t *flow_control_strategy,
-    size_t term_buffer_length,
+    aeron_uri_publication_params_t *params,
     bool is_exclusive,
     bool spies_simulate_connection,
     aeron_system_counters_t *system_counters);
 
-void aeron_network_publication_close(aeron_counters_manager_t *counters_manager, aeron_network_publication_t *publication);
+void aeron_network_publication_close(
+    aeron_counters_manager_t *counters_manager, aeron_network_publication_t *publication);
 
 void aeron_network_publication_incref(void *clientd);
+
 void aeron_network_publication_decref(void *clientd);
+
 void aeron_network_publication_on_time_event(
     aeron_driver_conductor_t *conductor, aeron_network_publication_t *publication, int64_t now_ns, int64_t now_ms);
 
@@ -240,10 +243,10 @@ inline int64_t aeron_network_publication_max_spy_position(aeron_network_publicat
 
     for (size_t i = 0, length = publication->conductor_fields.subscribable.length; i < length; i++)
     {
-        int64_t spy_position =
-            aeron_counter_get_volatile(publication->conductor_fields.subscribable.array[i].value_addr);
+        int64_t spy_position = aeron_counter_get_volatile(
+            publication->conductor_fields.subscribable.array[i].value_addr);
 
-        position = (spy_position > position) ? spy_position : position;
+        position = spy_position > position ? spy_position : position;
     }
 
     return position;
@@ -254,4 +257,4 @@ inline size_t aeron_network_publication_num_spy_subscribers(aeron_network_public
     return publication->conductor_fields.subscribable.length;
 }
 
-#endif //AERON_AERON_NETWORK_PUBLICATION_H
+#endif //AERON_NETWORK_PUBLICATION_H

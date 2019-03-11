@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ namespace aeron { namespace concurrent {
 class SleepingIdleStrategy
 {
 public:
-    SleepingIdleStrategy(const std::chrono::duration<long, std::milli> duration) :
+    explicit SleepingIdleStrategy(const std::chrono::duration<long, std::milli> duration) :
         m_duration(duration)
     {
     }
@@ -36,6 +36,10 @@ public:
         {
             std::this_thread::sleep_for(m_duration);
         }
+    }
+
+    inline void reset()
+    {
     }
 
     inline void idle()

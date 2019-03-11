@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ public class ClientProxy
     private final OperationSucceededFlyweight operationSucceeded = new OperationSucceededFlyweight();
     private final ImageMessageFlyweight imageMessage = new ImageMessageFlyweight();
     private final CounterUpdateFlyweight counterUpdate = new CounterUpdateFlyweight();
+    private final ClientTimeoutFlyweight clientTimeout = new ClientTimeoutFlyweight();
 
     public ClientProxy(final BroadcastTransmitter transmitter)
     {
@@ -51,6 +52,7 @@ public class ClientProxy
         operationSucceeded.wrap(buffer, 0);
         imageMessage.wrap(buffer, 0);
         counterUpdate.wrap(buffer, 0);
+        clientTimeout.wrap(buffer, 0);
     }
 
     public void onError(final long correlationId, final ErrorCode errorCode, final String errorMessage)
@@ -154,6 +156,13 @@ public class ClientProxy
             .counterId(counterId);
 
         transmit(ON_UNAVAILABLE_COUNTER, buffer, 0, CounterUpdateFlyweight.LENGTH);
+    }
+
+    public void onClientTimeout(final long clientId)
+    {
+        clientTimeout.clientId(clientId);
+
+        transmit(ON_CLIENT_TIMEOUT, buffer, 0, ClientTimeoutFlyweight.LENGTH);
     }
 
     private void transmit(final int msgTypeId, final DirectBuffer buffer, final int index, final int length)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,10 @@ import org.agrona.DirectBuffer;
  */
 public class ControlResponsePoller implements ControlledFragmentHandler
 {
-    private static final int FRAGMENT_LIMIT = 10;
+    /**
+     * Limit to apply when polling response messages.
+     */
+    public static final int FRAGMENT_LIMIT = 10;
 
     private final MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
     private final ControlResponseDecoder controlResponseDecoder = new ControlResponseDecoder();
@@ -39,6 +42,7 @@ public class ControlResponsePoller implements ControlledFragmentHandler
     private long correlationId = Aeron.NULL_VALUE;
     private long relevantId = Aeron.NULL_VALUE;
     private int templateId = Aeron.NULL_VALUE;
+    private final int fragmentLimit;
     private ControlResponseCode code;
     private String errorMessage;
     private boolean pollComplete = false;
@@ -47,10 +51,23 @@ public class ControlResponsePoller implements ControlledFragmentHandler
      * Create a poller for a given subscription to an archive for control response messages.
      *
      * @param subscription  to poll for new events.
+     * @param fragmentLimit to apply when polling.
+     */
+    private ControlResponsePoller(final Subscription subscription, final int fragmentLimit)
+    {
+        this.subscription = subscription;
+        this.fragmentLimit = fragmentLimit;
+    }
+
+    /**
+     * Create a poller for a given subscription to an archive for control response messages with a default
+     * fragment limit for polling as {@link #FRAGMENT_LIMIT}.
+     *
+     * @param subscription  to poll for new events.
      */
     public ControlResponsePoller(final Subscription subscription)
     {
-        this.subscription = subscription;
+        this(subscription, FRAGMENT_LIMIT);
     }
 
     /**
@@ -74,9 +91,10 @@ public class ControlResponsePoller implements ControlledFragmentHandler
         correlationId = -1;
         relevantId = -1;
         templateId = -1;
+        errorMessage = null;
         pollComplete = false;
 
-        return subscription.controlledPoll(fragmentAssembler, FRAGMENT_LIMIT);
+        return subscription.controlledPoll(fragmentAssembler, fragmentLimit);
     }
 
     /**
@@ -152,41 +170,51 @@ public class ControlResponsePoller implements ControlledFragmentHandler
     public ControlledFragmentAssembler.Action onFragment(
         final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
-        messageHeaderDecoder.wrap(buffer, offset);
-
-        templateId = messageHeaderDecoder.templateId();
-        switch (templateId)
+        if (pollComplete)
         {
-            case ControlResponseDecoder.TEMPLATE_ID:
-                controlResponseDecoder.wrap(
-                    buffer,
-                    offset + MessageHeaderEncoder.ENCODED_LENGTH,
-                    messageHeaderDecoder.blockLength(),
-                    messageHeaderDecoder.version());
-
-                controlSessionId = controlResponseDecoder.controlSessionId();
-                correlationId = controlResponseDecoder.correlationId();
-                relevantId = controlResponseDecoder.relevantId();
-                code = controlResponseDecoder.code();
-                if (ControlResponseCode.ERROR == code)
-                {
-                    errorMessage = controlResponseDecoder.errorMessage();
-                }
-                else
-                {
-                    errorMessage = "";
-                }
-                break;
-
-            case RecordingDescriptorDecoder.TEMPLATE_ID:
-                break;
-
-            default:
-                throw new ArchiveException("unknown templateId: " + templateId);
+            return Action.ABORT;
         }
 
-        pollComplete = true;
+        messageHeaderDecoder.wrap(buffer, offset);
 
-        return Action.BREAK;
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ArchiveException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
+
+        templateId = messageHeaderDecoder.templateId();
+        if (templateId == ControlResponseDecoder.TEMPLATE_ID)
+        {
+            controlResponseDecoder.wrap(
+                buffer,
+                offset + MessageHeaderEncoder.ENCODED_LENGTH,
+                messageHeaderDecoder.blockLength(),
+                messageHeaderDecoder.version());
+
+            controlSessionId = controlResponseDecoder.controlSessionId();
+            correlationId = controlResponseDecoder.correlationId();
+            relevantId = controlResponseDecoder.relevantId();
+            code = controlResponseDecoder.code();
+            errorMessage = controlResponseDecoder.errorMessage();
+            pollComplete = true;
+
+            return Action.BREAK;
+        }
+
+        return Action.CONTINUE;
+    }
+
+    public String toString()
+    {
+        return "ControlResponsePoller{" +
+            "controlSessionId=" + controlSessionId +
+            ", correlationId=" + correlationId +
+            ", relevantId=" + relevantId +
+            ", templateId=" + templateId +
+            ", code=" + code +
+            ", errorMessage='" + errorMessage + '\'' +
+            ", pollComplete=" + pollComplete +
+            '}';
     }
 }

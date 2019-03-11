@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef AERON_DISTINCTERRORLOG_H
-#define AERON_DISTINCTERRORLOG_H
+#ifndef AERON_CONCURRENT_DISTINCT_ERROR_LOG_H
+#define AERON_CONCURRENT_DISTINCT_ERROR_LOG_H
 
 #include <functional>
 #include <typeinfo>
@@ -27,11 +27,7 @@
 #include <util/BitUtil.h>
 #include "ErrorLogDescriptor.h"
 
-namespace aeron {
-
-namespace concurrent {
-
-namespace errors {
+namespace aeron { namespace concurrent { namespace errors {
 
 class DistinctErrorLog
 {
@@ -80,7 +76,7 @@ public:
         util::index_t offset = observation.m_offset;
 
         m_buffer.getAndAddInt32(offset + ErrorLogDescriptor::OBSERVATION_COUNT_OFFSET, 1);
-        m_buffer.putInt64Ordered(offset + ErrorLogDescriptor::LAST_OBERSATION_TIMESTAMP_OFFSET, timestamp);
+        m_buffer.putInt64Ordered(offset + ErrorLogDescriptor::LAST_OBSERVATION_TIMESTAMP_OFFSET, timestamp);
 
         return true;
     }
@@ -102,7 +98,8 @@ private:
 
     util::index_t m_nextOffset;
 
-    static std::string encodeObservation(std::size_t errorCode, const std::string& description, const std::string& message)
+    static std::string encodeObservation(
+        std::size_t errorCode, const std::string& description, const std::string& message)
     {
         return description + " " + message;
     }
@@ -144,7 +141,8 @@ private:
         if (it == m_observations.end())
         {
             const std::string encodedError = encodeObservation(errorCode, description, message);
-            const util::index_t length = ErrorLogDescriptor::HEADER_LENGTH + static_cast<util::index_t>(encodedError.length());
+            const util::index_t length =
+                ErrorLogDescriptor::HEADER_LENGTH + static_cast<util::index_t>(encodedError.length());
             const util::index_t offset = m_nextOffset;
 
             if ((offset + length) > m_buffer.capacity())
@@ -153,7 +151,7 @@ private:
             }
 
             m_buffer.putStringWithoutLength(offset + ErrorLogDescriptor::ENCODED_ERROR_OFFSET, encodedError);
-            m_buffer.putInt64(offset + ErrorLogDescriptor::FIRST_OBERSATION_TIMESTAMP_OFFSET, timestamp);
+            m_buffer.putInt64(offset + ErrorLogDescriptor::FIRST_OBSERVATION_TIMESTAMP_OFFSET, timestamp);
 
             m_nextOffset = util::BitUtil::align(offset + length, ErrorLogDescriptor::RECORD_ALIGNMENT);
 

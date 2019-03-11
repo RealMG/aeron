@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package io.aeron;
 import io.aeron.driver.*;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
+import io.aeron.logbuffer.LogBufferDescriptor;
 import io.aeron.protocol.DataHeaderFlyweight;
 import org.agrona.DirectBuffer;
 import org.agrona.IoUtil;
+import org.agrona.SystemUtil;
 import org.agrona.collections.MutableInteger;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.After;
@@ -28,9 +30,9 @@ import org.junit.Test;
 
 import java.io.File;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
 
 /**
@@ -42,12 +44,12 @@ public class FlowControlStrategiesTest
 
     private static final int STREAM_ID = 1;
 
-    private static final int TERM_BUFFER_LENGTH = 64 * 1024;
+    private static final int TERM_BUFFER_LENGTH = LogBufferDescriptor.TERM_MIN_LENGTH;
     private static final int NUM_MESSAGES_PER_TERM = 64;
     private static final int MESSAGE_LENGTH =
         (TERM_BUFFER_LENGTH / NUM_MESSAGES_PER_TERM) - DataHeaderFlyweight.HEADER_LENGTH;
     private static final String ROOT_DIR =
-        IoUtil.tmpDirName() + "aeron-system-tests-" + UUID.randomUUID().toString() + File.separator;
+        SystemUtil.tmpDirName() + "aeron-system-tests-" + UUID.randomUUID().toString() + File.separator;
 
     private final MediaDriver.Context driverAContext = new MediaDriver.Context();
     private final MediaDriver.Context driverBContext = new MediaDriver.Context();
@@ -73,18 +75,27 @@ public class FlowControlStrategiesTest
 
         driverAContext.publicationTermBufferLength(TERM_BUFFER_LENGTH)
             .aeronDirectoryName(baseDirA)
+            .timerIntervalNs(TimeUnit.MILLISECONDS.toNanos(100))
             .errorHandler(Throwable::printStackTrace)
             .threadingMode(ThreadingMode.SHARED);
 
         driverBContext.publicationTermBufferLength(TERM_BUFFER_LENGTH)
             .aeronDirectoryName(baseDirB)
+            .timerIntervalNs(TimeUnit.MILLISECONDS.toNanos(100))
             .errorHandler(Throwable::printStackTrace)
             .threadingMode(ThreadingMode.SHARED);
 
         driverA = MediaDriver.launch(driverAContext);
         driverB = MediaDriver.launch(driverBContext);
-        clientA = Aeron.connect(new Aeron.Context().aeronDirectoryName(driverAContext.aeronDirectoryName()));
-        clientB = Aeron.connect(new Aeron.Context().aeronDirectoryName(driverBContext.aeronDirectoryName()));
+        clientA = Aeron.connect(
+            new Aeron.Context()
+                .errorHandler(Throwable::printStackTrace)
+                .aeronDirectoryName(driverAContext.aeronDirectoryName()));
+
+        clientB = Aeron.connect(
+            new Aeron.Context()
+                .errorHandler(Throwable::printStackTrace)
+                .aeronDirectoryName(driverBContext.aeronDirectoryName()));
     }
 
     @After
@@ -115,11 +126,9 @@ public class FlowControlStrategiesTest
     }
 
     @Test(timeout = 10_000)
-    public void shouldTimeoutImageWhenBehindForTooLongWithMaxMulticastFlowControlStrategy() throws Exception
+    public void shouldTimeoutImageWhenBehindForTooLongWithMaxMulticastFlowControlStrategy()
     {
         final int numMessagesToSend = NUM_MESSAGES_PER_TERM * 3;
-        final CountDownLatch unavailableCountDownLatch = new CountDownLatch(1);
-        final CountDownLatch availableCountDownLatch = new CountDownLatch(2);
 
         driverBContext.imageLivenessTimeoutNs(TimeUnit.MILLISECONDS.toNanos(500));
         driverAContext.multicastFlowControlSupplier(
@@ -128,11 +137,7 @@ public class FlowControlStrategiesTest
         launch();
 
         subscriptionA = clientA.addSubscription(MULTICAST_URI, STREAM_ID);
-        subscriptionB = clientB.addSubscription(
-            MULTICAST_URI,
-            STREAM_ID,
-            (image) -> availableCountDownLatch.countDown(),
-            (image) -> unavailableCountDownLatch.countDown());
+        subscriptionB = clientB.addSubscription(MULTICAST_URI, STREAM_ID);
         publication = clientA.addPublication(MULTICAST_URI, STREAM_ID);
 
         while (!subscriptionA.isConnected() || !subscriptionB.isConnected())
@@ -177,9 +182,6 @@ public class FlowControlStrategiesTest
                     TimeUnit.MILLISECONDS.toNanos(500));
             }
         }
-
-        unavailableCountDownLatch.await();
-        availableCountDownLatch.await();
 
         verify(fragmentHandlerA, times(numMessagesToSend)).onFragment(
             any(DirectBuffer.class),
@@ -311,12 +313,11 @@ public class FlowControlStrategiesTest
             any(Header.class));
     }
 
-    @Test(timeout = 10_000)
-    public void shouldSlowDownToSlowPreferredWithPreferredMulticastFlowControlStrategy()
+    @Test(timeout = 15_000)
+    public void shouldSlowToPreferredWithMulticastFlowControlStrategy()
     {
         final int numMessagesToSend = NUM_MESSAGES_PER_TERM * 3;
         int numMessagesLeftToSend = numMessagesToSend;
-        int numFragmentsFromA = 0;
         int numFragmentsFromB = 0;
 
         driverBContext.imageLivenessTimeoutNs(TimeUnit.MILLISECONDS.toNanos(500));
@@ -336,13 +337,18 @@ public class FlowControlStrategiesTest
             Thread.yield();
         }
 
-        for (long i = 0; numFragmentsFromB < numMessagesToSend || numFragmentsFromA < numMessagesToSend; i++)
+        for (long i = 0; numFragmentsFromB < numMessagesToSend; i++)
         {
             if (numMessagesLeftToSend > 0)
             {
-                if (publication.offer(buffer, 0, buffer.capacity()) >= 0L)
+                final long result = publication.offer(buffer, 0, buffer.capacity());
+                if (result >= 0L)
                 {
                     numMessagesLeftToSend--;
+                }
+                else if (Publication.NOT_CONNECTED == result)
+                {
+                    fail("Publication not connected, numMessagesLeftToSend=" + numMessagesLeftToSend);
                 }
             }
 
@@ -350,82 +356,27 @@ public class FlowControlStrategiesTest
             Thread.yield();
 
             // A keeps up
-            numFragmentsFromA += subscriptionA.poll(fragmentHandlerA, 10);
+            subscriptionA.poll(fragmentHandlerA, 10);
 
             // B receives slowly
             if ((i % 2) == 0)
             {
-                numFragmentsFromB += subscriptionB.poll(fragmentHandlerB, 1);
+                final int bFragments = subscriptionB.poll(fragmentHandlerB, 1);
+                if (0 == bFragments && !subscriptionB.isConnected())
+                {
+                    if (subscriptionB.isClosed())
+                    {
+                        fail("Subscription B is closed, numFragmentsFromB=" + numFragmentsFromB);
+                    }
+
+                    fail("Subscription B not connected, numFragmentsFromB=" + numFragmentsFromB);
+                }
+
+                numFragmentsFromB += bFragments;
             }
         }
-
-        verify(fragmentHandlerA, times(numMessagesToSend)).onFragment(
-            any(DirectBuffer.class),
-            anyInt(),
-            eq(MESSAGE_LENGTH),
-            any(Header.class));
 
         verify(fragmentHandlerB, times(numMessagesToSend)).onFragment(
-            any(DirectBuffer.class),
-            anyInt(),
-            eq(MESSAGE_LENGTH),
-            any(Header.class));
-    }
-
-    @Test(timeout = 10_000)
-    public void shouldKeepUpToFastPreferredWithPreferredMulticastFlowControlStrategy()
-    {
-        final int numMessagesToSend = NUM_MESSAGES_PER_TERM * 3;
-        int numMessagesLeftToSend = numMessagesToSend;
-        int numFragmentsFromA = 0;
-
-        driverBContext.imageLivenessTimeoutNs(TimeUnit.MILLISECONDS.toNanos(500));
-        driverAContext.multicastFlowControlSupplier(
-            (udpChannel, streamId, registrationId) -> new PreferredMulticastFlowControl());
-        driverAContext.applicationSpecificFeedback(PreferredMulticastFlowControl.PREFERRED_ASF_BYTES);
-
-        launch();
-
-        subscriptionA = clientA.addSubscription(MULTICAST_URI, STREAM_ID);
-        subscriptionB = clientB.addSubscription(MULTICAST_URI, STREAM_ID);
-        publication = clientA.addPublication(MULTICAST_URI, STREAM_ID);
-
-        while (!subscriptionA.isConnected() || !subscriptionB.isConnected())
-        {
-            SystemTest.checkInterruptedStatus();
-            Thread.yield();
-        }
-
-        for (long i = 0; numFragmentsFromA < numMessagesToSend; i++)
-        {
-            if (numMessagesLeftToSend > 0)
-            {
-                if (publication.offer(buffer, 0, buffer.capacity()) >= 0L)
-                {
-                    numMessagesLeftToSend--;
-                }
-            }
-
-            SystemTest.checkInterruptedStatus();
-            Thread.yield();
-
-            // A keeps up
-            numFragmentsFromA += subscriptionA.poll(fragmentHandlerA, 10);
-
-            // B receives slowly
-            if ((i % 2) == 0)
-            {
-                subscriptionB.poll(fragmentHandlerB, 1);
-            }
-        }
-
-        verify(fragmentHandlerA, times(numMessagesToSend)).onFragment(
-            any(DirectBuffer.class),
-            anyInt(),
-            eq(MESSAGE_LENGTH),
-            any(Header.class));
-
-        verify(fragmentHandlerB, atMost(numMessagesToSend)).onFragment(
             any(DirectBuffer.class),
             anyInt(),
             eq(MESSAGE_LENGTH),

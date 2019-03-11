@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ public class EmbeddedPingPong
     private static final int FRAME_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
     private static final String PING_CHANNEL = SampleConfiguration.PING_CHANNEL;
     private static final String PONG_CHANNEL = SampleConfiguration.PONG_CHANNEL;
+    private static final boolean EXCLUSIVE_PUBLICATIONS = SampleConfiguration.EXCLUSIVE_PUBLICATIONS;
 
     private static final UnsafeBuffer OFFER_BUFFER = new UnsafeBuffer(
         BufferUtil.allocateDirectAligned(MESSAGE_LENGTH, BitUtil.CACHE_LINE_LENGTH));
@@ -94,20 +95,21 @@ public class EmbeddedPingPong
         System.out.println("Publishing Ping at " + PING_CHANNEL + " on stream Id " + PING_STREAM_ID);
         System.out.println("Subscribing Pong at " + PONG_CHANNEL + " on stream Id " + PONG_STREAM_ID);
         System.out.println("Message payload length of " + MESSAGE_LENGTH + " bytes");
+        System.out.println("Using exclusive publications: " + EXCLUSIVE_PUBLICATIONS);
 
         final FragmentAssembler dataHandler = new FragmentAssembler(EmbeddedPingPong::pongHandler);
 
         try (Aeron aeron = Aeron.connect(ctx);
-            Publication pingPublication = aeron.addPublication(PING_CHANNEL, PING_STREAM_ID);
-            Subscription pongSubscription = aeron.addSubscription(PONG_CHANNEL, PONG_STREAM_ID))
+            Subscription pongSubscription = aeron.addSubscription(PONG_CHANNEL, PONG_STREAM_ID);
+            Publication pingPublication = EXCLUSIVE_PUBLICATIONS ?
+                aeron.addExclusivePublication(PING_CHANNEL, PING_STREAM_ID) :
+                aeron.addPublication(PING_CHANNEL, PING_STREAM_ID))
         {
             System.out.println("Waiting for new image from Pong...");
-
             PONG_IMAGE_LATCH.await();
 
-            System.out.println(
-                "Warming up... " + WARMUP_NUMBER_OF_ITERATIONS +
-                " iterations of " + WARMUP_NUMBER_OF_MESSAGES + " messages");
+            System.out.format("Warming up... %d iterations of %,d messages%n",
+                WARMUP_NUMBER_OF_ITERATIONS, WARMUP_NUMBER_OF_MESSAGES);
 
             for (int i = 0; i < WARMUP_NUMBER_OF_ITERATIONS; i++)
             {
@@ -120,7 +122,7 @@ public class EmbeddedPingPong
             do
             {
                 HISTOGRAM.reset();
-                System.out.println("Pinging " + NUMBER_OF_MESSAGES + " messages");
+                System.out.format("Pinging %,d messages%n", NUMBER_OF_MESSAGES);
 
                 roundTripMessages(dataHandler, pingPublication, pongSubscription, NUMBER_OF_MESSAGES);
 
@@ -141,8 +143,10 @@ public class EmbeddedPingPong
             final Aeron.Context ctx = new Aeron.Context().aeronDirectoryName(embeddedDirName);
 
             try (Aeron aeron = Aeron.connect(ctx);
-                Publication pongPublication = aeron.addPublication(PONG_CHANNEL, PONG_STREAM_ID);
-                Subscription pingSubscription = aeron.addSubscription(PING_CHANNEL, PING_STREAM_ID))
+                Subscription pingSubscription = aeron.addSubscription(PING_CHANNEL, PING_STREAM_ID);
+                Publication pongPublication = EXCLUSIVE_PUBLICATIONS ?
+                    aeron.addExclusivePublication(PONG_CHANNEL, PONG_STREAM_ID) :
+                    aeron.addPublication(PONG_CHANNEL, PONG_STREAM_ID))
             {
                 final FragmentAssembler dataHandler = new FragmentAssembler(
                     (buffer, offset, length, header) -> pingHandler(pongPublication, buffer, offset, length));

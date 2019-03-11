@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,7 @@ namespace aeron { namespace concurrent {
 class YieldingIdleStrategy
 {
 public:
-    YieldingIdleStrategy()
-    {
-    }
+    YieldingIdleStrategy() = default;
 
     inline void idle(int workCount)
     {
@@ -36,6 +34,10 @@ public:
         }
 
         std::this_thread::yield();
+    }
+
+    inline void reset()
+    {
     }
 
     inline void idle()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.aeron.driver.media;
+package io.aeron.cluster;
 
-import java.net.InetSocketAddress;
-
-public class DestinationImageControlAddress
+class TestMessages
 {
-    public long timeOfLastFrameNs;
-    public final InetSocketAddress address;
-
-    public DestinationImageControlAddress(final long timeOfLastFrameNs, final InetSocketAddress address)
-    {
-        this.timeOfLastFrameNs = timeOfLastFrameNs;
-        this.address = address;
-    }
+    static final String NO_OP = "No op!           ";
+    static final String REGISTER_TIMER = "Register a timer!";
 }

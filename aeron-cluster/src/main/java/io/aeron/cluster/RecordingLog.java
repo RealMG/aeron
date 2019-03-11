@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ import static org.agrona.BitUtil.*;
  *  |              Log Position at beginning of term                |
  *  |                                                               |
  *  +---------------------------------------------------------------+
- *  |              Log Position reached for the entry               |
+ *  |        Log Position when entry was created or committed       |
  *  |                                                               |
  *  +---------------------------------------------------------------+
  *  |               Timestamp when entry was created                |
@@ -600,16 +600,14 @@ public class RecordingLog implements AutoCloseable
     }
 
     /**
-     * Has the given leadershipTermId already been appended?
+     * Has the given leadershipTermId unknown to the log?
      *
      * @param leadershipTermId to check
-     * @return true if term was already appended or false if not.
+     * @return true if term has not yet been appended otherwise false.
      */
-    public boolean hasTermBeenAppended(final long leadershipTermId)
+    public boolean isUnknown(final long leadershipTermId)
     {
-        final int index = (int)indexByLeadershipTermIdMap.get(leadershipTermId);
-
-        return (NULL_VALUE != index);
+        return NULL_VALUE == indexByLeadershipTermIdMap.get(leadershipTermId);
     }
 
     /**
@@ -925,37 +923,7 @@ public class RecordingLog implements AutoCloseable
 
         if (-1 != snapshotIndex)
         {
-            final Entry snapshot = entries.get(snapshotIndex);
-            snapshots.add(new Snapshot(
-                snapshot.recordingId,
-                snapshot.leadershipTermId,
-                snapshot.termBaseLogPosition,
-                snapshot.logPosition,
-                snapshot.timestamp,
-                snapshot.serviceId));
-
-            for (int i = 1; i <= serviceCount; i++)
-            {
-                if ((snapshotIndex - i) < 0)
-                {
-                    throw new ClusterException("snapshot missing for service at index " + i + " in " + entries);
-                }
-
-                final Entry entry = entries.get(snapshotIndex - 1);
-
-                if (ENTRY_TYPE_SNAPSHOT == entry.type &&
-                    entry.leadershipTermId == snapshot.leadershipTermId &&
-                    entry.logPosition == snapshot.logPosition)
-                {
-                    snapshots.add(entry.serviceId + 1, new Snapshot(
-                        entry.recordingId,
-                        entry.leadershipTermId,
-                        entry.termBaseLogPosition,
-                        entry.logPosition,
-                        entry.timestamp,
-                        entry.serviceId));
-                }
-            }
+            addSnapshots(snapshots, entries, serviceCount, snapshotIndex);
         }
 
         if (-1 != logIndex)
@@ -977,6 +945,45 @@ public class RecordingLog implements AutoCloseable
                 recordingExtent.termBufferLength,
                 recordingExtent.mtuLength,
                 recordingExtent.sessionId));
+        }
+    }
+
+    static void addSnapshots(
+        final ArrayList<Snapshot> snapshots,
+        final ArrayList<Entry> entries,
+        final int serviceCount,
+        final int snapshotIndex)
+    {
+        final Entry snapshot = entries.get(snapshotIndex);
+        snapshots.add(new Snapshot(
+            snapshot.recordingId,
+            snapshot.leadershipTermId,
+            snapshot.termBaseLogPosition,
+            snapshot.logPosition,
+            snapshot.timestamp,
+            snapshot.serviceId));
+
+        for (int i = 1; i <= serviceCount; i++)
+        {
+            if ((snapshotIndex - i) < 0)
+            {
+                throw new ClusterException("snapshot missing for service at index " + i + " in " + entries);
+            }
+
+            final Entry entry = entries.get(snapshotIndex - i);
+
+            if (ENTRY_TYPE_SNAPSHOT == entry.type &&
+                entry.leadershipTermId == snapshot.leadershipTermId &&
+                entry.logPosition == snapshot.logPosition)
+            {
+                snapshots.add(entry.serviceId + 1, new Snapshot(
+                    entry.recordingId,
+                    entry.leadershipTermId,
+                    entry.termBaseLogPosition,
+                    entry.logPosition,
+                    entry.timestamp,
+                    entry.serviceId));
+            }
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef AERON_COUNTERSREADER_H
-#define AERON_COUNTERSREADER_H
+#ifndef AERON_COUNTERS_READER_H
+#define AERON_COUNTERS_READER_H
 
 #include <cstdint>
 #include <cstddef>
@@ -189,6 +189,8 @@ public:
     };
 #pragma pack(pop)
 
+    static const std::int32_t NULL_COUNTER_ID = -1;
+
     static const std::int32_t RECORD_UNUSED = 0;
     static const std::int32_t RECORD_ALLOCATED = 1;
     static const std::int32_t RECORD_RECLAIMED = -1;
@@ -197,6 +199,7 @@ public:
 
     static const util::index_t COUNTER_LENGTH = sizeof(CounterValueDefn);
     static const util::index_t METADATA_LENGTH = sizeof(CounterMetaDataDefn);
+    static const util::index_t TYPE_ID_OFFSET = offsetof(CounterMetaDataDefn, typeId);
     static const util::index_t FREE_TO_REUSE_DEADLINE_OFFSET = offsetof(CounterMetaDataDefn, freeToReuseDeadline);
     static const util::index_t KEY_OFFSET = offsetof(CounterMetaDataDefn, key);
     static const util::index_t LABEL_LENGTH_OFFSET = offsetof(CounterMetaDataDefn, labelLength);
@@ -214,7 +217,8 @@ protected:
         if (counterId < 0 || counterId > m_maxCounterId)
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("Counter Id %d out of range: maxCounterId=%d", counterId, m_maxCounterId),
+                "counter id " + std::to_string(counterId) +
+                " out of range: maxCounterId=" + std::to_string(m_maxCounterId),
                 SOURCEINFO);
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,6 +118,10 @@ class CmdInterceptor
 
             case REMOVE_RCV_DESTINATION:
                 LOGGER.log(CMD_IN_REMOVE_RCV_DESTINATION, buffer, index, length);
+                break;
+
+            case ON_CLIENT_TIMEOUT:
+                LOGGER.log(CMD_OUT_ON_CLIENT_TIMEOUT, buffer, index, length);
                 break;
         }
     }

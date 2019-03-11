@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_UNSAFEBUFFERPOSITION_H
-#define AERON_UNSAFEBUFFERPOSITION_H
+#ifndef AERON_UNSAFE_BUFFER_POSITION_H
+#define AERON_UNSAFE_BUFFER_POSITION_H
 
 #include <concurrent/AtomicBuffer.h>
 #include <concurrent/CountersManager.h>
@@ -33,29 +33,15 @@ public:
     {
     }
 
-    UnsafeBufferPosition(const UnsafeBufferPosition& position)
-    {
-        m_buffer.wrap(position.m_buffer);
-        m_id = position.m_id;
-        m_offset = position.m_offset;
-    }
-
     UnsafeBufferPosition() :
         m_id(-1),
         m_offset(0)
     {
     }
 
-    UnsafeBufferPosition& operator=(const UnsafeBufferPosition& position)
-    {
-        wrap(position);
-
-        return *this;
-    }
-
     inline void wrap(const UnsafeBufferPosition& position)
     {
-        m_buffer.wrap(position.m_buffer);
+        m_buffer = position.m_buffer;
         m_id = position.m_id;
         m_offset = position.m_offset;
     }
@@ -97,4 +83,4 @@ private:
 
 }}}
 
-#endif //AERON_UNSAFEBUFFERPOSITION_H
+#endif

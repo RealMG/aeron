@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include "aeron_loss_detector.h"
 #include "aeronmd.h"
+#include "aeron_windows.h"
 
 int aeron_loss_detector_init(
     aeron_loss_detector_t *detector,
@@ -62,16 +63,16 @@ int32_t aeron_loss_detector_scan(
 
         const int32_t rebuild_term_id = initial_term_id + rebuild_term_count;
         const int32_t hwm_term_offset = (int32_t)(hwm_position & term_length_mask);
-        const int32_t limit_offset = rebuild_term_count == hwm_term_count ? hwm_term_offset : (int32_t)(term_length_mask + 1);
+        const int32_t limit_offset = rebuild_term_count == hwm_term_count ?
+            hwm_term_offset : (int32_t)(term_length_mask + 1);
 
-        rebuild_offset =
-            aeron_term_gap_scanner_scan_for_gap(
-                buffer,
-                rebuild_term_id,
-                rebuild_offset,
-                limit_offset,
-                aeron_loss_detector_on_gap,
-                detector);
+        rebuild_offset = aeron_term_gap_scanner_scan_for_gap(
+            buffer,
+            rebuild_term_id,
+            rebuild_offset,
+            limit_offset,
+            aeron_loss_detector_on_gap,
+            detector);
 
         if (rebuild_offset < limit_offset)
         {
@@ -99,17 +100,18 @@ int64_t aeron_loss_detector_nak_multicast_delay_generator()
 
     if (!initialized)
     {
-        lambda = log(AERON_LOSS_DETECTOR_NAK_MULTICAST_GROUPSIZE) + 1;
-        rand_max = lambda / AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF;
-        base_x = lambda / (AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF * (exp(lambda) - 1));
-        constant_t = AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF / lambda;
+        lambda = log(AERON_LOSS_DETECTOR_NAK_MULTICAST_GROUP_SIZE) + 1;
+        rand_max = lambda / AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF_NS;
+        base_x = lambda / (AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF_NS * (exp(lambda) - 1));
+        constant_t = AERON_LOSS_DETECTOR_NAK_MULTICAST_MAX_BACKOFF_NS / lambda;
         factor_t = (exp(lambda) - 1) * constant_t;
-        srand48(aeron_nano_clock());
+        aeron_srand48(aeron_nano_clock());
 
         initialized = true;
     }
 
-    const double x = (drand48() * rand_max) + base_x;
+    const double x = (aeron_drand48() * rand_max) + base_x;
+
     return (int64_t)(constant_t * log(x * factor_t));
 }
 

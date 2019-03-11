@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ extern "C"
 #include <concurrent/aeron_mpsc_rb.h>
 }
 
+#undef max
 #define CAPACITY (1024)
 #define BUFFER_SZ (CAPACITY + AERON_RB_TRAILER_LENGTH)
 #define ODD_BUFFER_SZ ((CAPACITY - 1) + AERON_RB_TRAILER_LENGTH)

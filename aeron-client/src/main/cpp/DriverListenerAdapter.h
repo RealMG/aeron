@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_DRIVER_LISTENER_ADAPTER__
-#define INCLUDED_AERON_DRIVER_LISTENER_ADAPTER__
+#ifndef AERON_DRIVER_LISTENER_ADAPTER_H
+#define AERON_DRIVER_LISTENER_ADAPTER_H
 
 #include <concurrent/broadcast/CopyBroadcastReceiver.h>
 #include <command/ControlProtocolEvents.h>
@@ -26,6 +26,7 @@
 #include <command/OperationSucceededFlyweight.h>
 #include <command/SubscriptionReadyFlyweight.h>
 #include <command/CounterUpdateFlyweight.h>
+#include <command/ClientTimeoutFlyweight.h>
 
 namespace aeron {
 
@@ -55,13 +56,13 @@ public:
                         const PublicationBuffersReadyFlyweight publicationReady(buffer, offset);
 
                         m_driverListener.onNewPublication(
+                            publicationReady.correlationId(),
+                            publicationReady.registrationId(),
                             publicationReady.streamId(),
                             publicationReady.sessionId(),
                             publicationReady.positionLimitCounterId(),
                             publicationReady.channelStatusIndicatorId(),
-                            publicationReady.logFileName(),
-                            publicationReady.correlationId(),
-                            publicationReady.registrationId());
+                            publicationReady.logFileName());
                         break;
                     }
 
@@ -70,13 +71,13 @@ public:
                         const PublicationBuffersReadyFlyweight publicationReady(buffer, offset);
 
                         m_driverListener.onNewExclusivePublication(
+                            publicationReady.correlationId(),
+                            publicationReady.registrationId(),
                             publicationReady.streamId(),
                             publicationReady.sessionId(),
                             publicationReady.positionLimitCounterId(),
                             publicationReady.channelStatusIndicatorId(),
-                            publicationReady.logFileName(),
-                            publicationReady.correlationId(),
-                            publicationReady.registrationId());
+                            publicationReady.logFileName());
                         break;
                     }
 
@@ -95,13 +96,12 @@ public:
                         const ImageBuffersReadyFlyweight imageReady(buffer, offset);
 
                         m_driverListener.onAvailableImage(
-                            imageReady.streamId(),
+                            imageReady.correlationId(),
                             imageReady.sessionId(),
-                            imageReady.logFileName(),
-                            imageReady.sourceIdentity(),
                             imageReady.subscriberPositionId(),
-                            imageReady.subscriberRegistrationId(),
-                            imageReady.correlationId());
+                            imageReady.subscriptionRegistrationId(),
+                            imageReady.logFileName(),
+                            imageReady.sourceIdentity());
                         break;
                     }
 
@@ -118,7 +118,6 @@ public:
                         const ImageMessageFlyweight imageMessage(buffer, offset);
 
                         m_driverListener.onUnavailableImage(
-                            imageMessage.streamId(),
                             imageMessage.correlationId(),
                             imageMessage.subscriptionRegistrationId());
                         break;
@@ -148,6 +147,14 @@ public:
                         const CounterUpdateFlyweight response(buffer, offset);
 
                         m_driverListener.onUnavailableCounter(response.correlationId(), response.counterId());
+                        break;
+                    }
+
+                    case ControlProtocolEvents::ON_CLIENT_TIMEOUT:
+                    {
+                        const ClientTimeoutFlyweight response(buffer, offset);
+
+                        m_driverListener.onClientTimeout(response.clientId());
                         break;
                     }
 

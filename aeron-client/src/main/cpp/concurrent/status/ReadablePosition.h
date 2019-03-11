@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_READONLYPOSITION_H
-#define AERON_READONLYPOSITION_H
+#ifndef AERON_READONLY_POSITION_H
+#define AERON_READONLY_POSITION_H
 
 namespace aeron { namespace concurrent { namespace status {
 
@@ -58,4 +58,4 @@ protected:
 
 }}}
 
-#endif //AERON_READONLYPOSITION_H
+#endif //AERON_READONLY_POSITION_H

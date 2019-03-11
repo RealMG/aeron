@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.aeron.driver;
 import io.aeron.ChannelUri;
 import io.aeron.CommonContext;
 import io.aeron.logbuffer.FrameDescriptor;
+import io.aeron.logbuffer.LogBufferDescriptor;
 
 import static io.aeron.CommonContext.*;
 
@@ -32,7 +33,6 @@ class SubscriptionParams
     boolean isReliable = true;
     boolean isSparse = true;
 
-    @SuppressWarnings("ConstantConditions")
     static SubscriptionParams getSubscriptionParams(final ChannelUri channelUri, final MediaDriver.Context context)
     {
         final SubscriptionParams params = new SubscriptionParams();
@@ -61,7 +61,7 @@ class SubscriptionParams
         {
             if (count < 3)
             {
-                throw new IllegalArgumentException("Params must be used as a complete set: " +
+                throw new IllegalArgumentException("params must be used as a complete set: " +
                     INITIAL_TERM_ID_PARAM_NAME + " " +
                     TERM_ID_PARAM_NAME + " " +
                     TERM_OFFSET_PARAM_NAME);
@@ -71,16 +71,23 @@ class SubscriptionParams
             params.termId = Integer.parseInt(termIdStr);
             params.termOffset = Integer.parseInt(termOffsetStr);
 
-            if (params.termOffset < 0)
+            if (params.termOffset < 0 || params.termOffset > LogBufferDescriptor.TERM_MAX_LENGTH)
             {
                 throw new IllegalArgumentException(
-                    TERM_OFFSET_PARAM_NAME + "=" + params.termOffset + " must be greater than zero");
+                    TERM_OFFSET_PARAM_NAME + "=" + params.termOffset + " out of range");
             }
 
             if ((params.termOffset & (FrameDescriptor.FRAME_ALIGNMENT - 1)) != 0)
             {
                 throw new IllegalArgumentException(
                     TERM_OFFSET_PARAM_NAME + "=" + params.termOffset + " must be a multiple of FRAME_ALIGNMENT");
+            }
+
+            if (params.termId - params.initialTermId < 0)
+            {
+                throw new IllegalStateException(
+                    "difference greater than 2^31 - 1: " + INITIAL_TERM_ID_PARAM_NAME + "=" +
+                    params.initialTermId + " when " + TERM_ID_PARAM_NAME + "=" + params.termId);
             }
 
             params.hasJoinPosition = true;

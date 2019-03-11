@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <sched.h>
 #include "aeron_driver_sender.h"
 #include "aeron_alloc.h"
+#include "concurrent/aeron_thread.h"
 
 void aeron_driver_sender_proxy_offer(aeron_driver_sender_proxy_t *sender_proxy, void *cmd)
 {
@@ -154,8 +154,7 @@ void aeron_driver_sender_proxy_on_add_destination(
     {
         aeron_command_destination_t cmd =
             {
-                .base.func = aeron_driver_sender_on_add_destination,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_sender_on_add_destination, .item = NULL },
                 .endpoint = endpoint
             };
         memcpy(&cmd.control_address, addr, sizeof(cmd.control_address));
@@ -188,8 +187,7 @@ void aeron_driver_sender_proxy_on_remove_destination(
     {
         aeron_command_destination_t cmd =
             {
-                .base.func = aeron_driver_sender_on_remove_destination,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_sender_on_remove_destination, .item = NULL },
                 .endpoint = endpoint
             };
         memcpy(&cmd.control_address, addr, sizeof(cmd.control_address));

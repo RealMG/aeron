@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_BROADCAST_COPY_BROADCAST_RECEIVER__
-#define INCLUDED_AERON_CONCURRENT_BROADCAST_COPY_BROADCAST_RECEIVER__
+#ifndef AERON_CONCURRENT_BROADCAST_COPY_BROADCAST_RECEIVER_H
+#define AERON_CONCURRENT_BROADCAST_COPY_BROADCAST_RECEIVER_H
 
 #include <array>
 #include <functional>
@@ -39,9 +39,6 @@ public:
         m_receiver(receiver),
         m_scratchBuffer(m_scratch)
     {
-        while (m_receiver.receiveNext())
-        {
-        }
     }
 
     int receive(const handler_t& handler)
@@ -53,14 +50,15 @@ public:
         {
             if (lastSeenLappedCount != m_receiver.lappedCount())
             {
-                throw util::IllegalArgumentException("Unable to keep up with broadcast buffer", SOURCEINFO);
+                throw util::IllegalArgumentException("unable to keep up with broadcast buffer", SOURCEINFO);
             }
 
             const std::int32_t length = m_receiver.length();
             if (length > m_scratchBuffer.capacity())
             {
                 throw util::IllegalStateException(
-                    util::strPrintf("Buffer required size %d but only has %d", length, m_scratchBuffer.capacity()), SOURCEINFO);
+                    "buffer required size " + std::to_string(length) +
+                    " but only has " + std::to_string(m_scratchBuffer.capacity()), SOURCEINFO);
             }
 
             const std::int32_t msgTypeId = m_receiver.typeId();
@@ -68,7 +66,7 @@ public:
 
             if (!m_receiver.validate())
             {
-                throw util::IllegalStateException("Unable to keep up with broadcast buffer", SOURCEINFO);
+                throw util::IllegalStateException("unable to keep up with broadcast buffer", SOURCEINFO);
             }
 
             handler(msgTypeId, m_scratchBuffer, 0, length);

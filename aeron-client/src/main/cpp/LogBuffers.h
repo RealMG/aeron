@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_LOG_BUFFERS__
-#define INCLUDED_AERON_LOG_BUFFERS__
+#ifndef AERON_LOG_BUFFERS_H
+#define AERON_LOG_BUFFERS_H
 
 #include <memory>
 #include <vector>
@@ -35,7 +35,7 @@ public:
     explicit LogBuffers(const char *filename);
     LogBuffers(std::uint8_t *address, std::int64_t logLength, std::int32_t termLength);
 
-    virtual ~LogBuffers();
+    ~LogBuffers();
 
     inline AtomicBuffer& atomicBuffer(int index)
     {

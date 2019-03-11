@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERMSCANNER__
-#define INCLUDED_AERON_CONCURRENT_LOGBUFFER_TERMSCANNER__
+#ifndef AERON_CONCURRENT_LOGBUFFER_TERM_SCANNER_H
+#define AERON_CONCURRENT_LOGBUFFER_TERM_SCANNER_H
 
 #include <util/BitUtil.h>
 #include "FrameDescriptor.h"
@@ -28,17 +28,17 @@ namespace TermScanner
 
 inline std::int64_t scanOutcome(std::int32_t padding, std::int32_t available)
 {
-    return ((std::int64_t) padding) << 32 | available;
+    return (static_cast<std::int64_t>(padding) << 32) | available;
 }
 
 inline std::int32_t available(std::int64_t scanOutcome)
 {
-    return (std::int32_t) scanOutcome;
+    return static_cast<std::int32_t>(scanOutcome);
 }
 
 inline std::int32_t padding(std::int64_t scanOutcome)
 {
-    return (std::int32_t) (scanOutcome >> 32);
+    return static_cast<std::int32_t>(scanOutcome >> 32);
 }
 
 inline std::int64_t scanForAvailability(AtomicBuffer& termBuffer, std::int32_t offset, std::int32_t maxLength)
@@ -81,4 +81,4 @@ inline std::int64_t scanForAvailability(AtomicBuffer& termBuffer, std::int32_t o
 
 }}}
 
-#endif //AERON_TERMSCANNER_H
+#endif

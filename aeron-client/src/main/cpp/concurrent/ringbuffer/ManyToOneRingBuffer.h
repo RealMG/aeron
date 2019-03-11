@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef AERON_CONCURRENT_RINGBUFFER_MANY_TO_ONE_RING_BUFFER__
-#define AERON_CONCURRENT_RINGBUFFER_MANY_TO_ONE_RING_BUFFER__
+#ifndef AERON_RING_BUFFER_MANY_TO_ONE_H
+#define AERON_RING_BUFFER_MANY_TO_ONE_H
 
 #include <limits.h>
 #include <functional>
@@ -32,8 +32,8 @@ namespace aeron { namespace concurrent { namespace ringbuffer {
 class ManyToOneRingBuffer
 {
 public:
-    ManyToOneRingBuffer(concurrent::AtomicBuffer& buffer)
-        : m_buffer(buffer)
+    ManyToOneRingBuffer(concurrent::AtomicBuffer& buffer) :
+        m_buffer(buffer)
     {
         m_capacity = buffer.capacity() - RingBufferDescriptor::TRAILER_LENGTH;
 
@@ -56,7 +56,8 @@ public:
         return m_capacity;
     }
 
-    bool write(std::int32_t msgTypeId, concurrent::AtomicBuffer& srcBuffer, util::index_t srcIndex, util::index_t length)
+    bool write(
+        std::int32_t msgTypeId, concurrent::AtomicBuffer& srcBuffer, util::index_t srcIndex, util::index_t length)
     {
         bool isSuccessful = false;
 
@@ -179,20 +180,24 @@ public:
 
     bool unblock()
     {
-        const util::index_t mask = m_capacity - 1;
-        const std::int32_t consumerIndex = static_cast<std::int32_t>(m_buffer.getInt64Volatile(m_headPositionIndex) & mask);
-        const std::int32_t producerIndex = static_cast<std::int32_t>(m_buffer.getInt64Volatile(m_tailPositionIndex) & mask);
+        const std::int64_t headPosition = m_buffer.getInt64Volatile(m_headPositionIndex);
+        const std::int64_t tailPosition = m_buffer.getInt64Volatile(m_tailPositionIndex);
 
-        if (producerIndex == consumerIndex)
+        if (tailPosition == headPosition)
         {
             return false;
         }
+
+        const util::index_t mask = m_capacity - 1;
+        const std::int32_t consumerIndex = static_cast<std::int32_t>(headPosition & mask);
+        const std::int32_t producerIndex = static_cast<std::int32_t>(tailPosition & mask);
 
         bool unblocked = false;
         std::int32_t length = m_buffer.getInt32Volatile(consumerIndex);
         if (length < 0)
         {
-            m_buffer.putInt64Ordered(consumerIndex, RecordDescriptor::makeHeader(-length, RecordDescriptor::PADDING_MSG_TYPE_ID));
+            m_buffer.putInt64Ordered(
+                consumerIndex, RecordDescriptor::makeHeader(-length, RecordDescriptor::PADDING_MSG_TYPE_ID));
             unblocked = true;
         }
         else if (0 == length)
@@ -207,7 +212,9 @@ public:
                 {
                     if (scanBackToConfirmStillZeroed(m_buffer, i, consumerIndex))
                     {
-                        m_buffer.putInt64Ordered(consumerIndex, RecordDescriptor::makeHeader(i - consumerIndex, RecordDescriptor::PADDING_MSG_TYPE_ID));
+                        m_buffer.putInt64Ordered(
+                            consumerIndex,
+                            RecordDescriptor::makeHeader(i - consumerIndex, RecordDescriptor::PADDING_MSG_TYPE_ID));
                         unblocked = true;
                     }
 
@@ -288,7 +295,8 @@ private:
 
         if (0 != padding)
         {
-            m_buffer.putInt64Ordered(tailIndex, RecordDescriptor::makeHeader(padding, RecordDescriptor::PADDING_MSG_TYPE_ID));
+            m_buffer.putInt64Ordered(
+                tailIndex, RecordDescriptor::makeHeader(padding, RecordDescriptor::PADDING_MSG_TYPE_ID));
             tailIndex = 0;
         }
 
@@ -300,11 +308,13 @@ private:
         if (length > m_maxMsgLength)
         {
             throw util::IllegalArgumentException(
-                util::strPrintf("encoded message exceeds maxMsgLength of %d, length=%d", m_maxMsgLength, length), SOURCEINFO);
+                "encoded message exceeds maxMsgLength of " + std::to_string(m_maxMsgLength) +
+                " length=" + std::to_string(length),
+                SOURCEINFO);
         }
     }
 
-    inline static bool scanBackToConfirmStillZeroed(AtomicBuffer& buffer, std::int32_t from, std::int32_t limit)
+    inline static bool scanBackToConfirmStillZeroed(const AtomicBuffer& buffer, std::int32_t from, std::int32_t limit)
     {
         std::int32_t i = from - RecordDescriptor::ALIGNMENT;
         bool allZeroes = true;

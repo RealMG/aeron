@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package io.aeron.driver;
 
 import io.aeron.Aeron;
 import io.aeron.driver.buffer.RawLog;
-import io.aeron.driver.media.DestinationImageControlAddress;
+import io.aeron.driver.media.ImageConnection;
 import io.aeron.driver.media.ReceiveChannelEndpoint;
 import io.aeron.driver.media.ReceiveDestinationUdpTransport;
 import io.aeron.driver.reports.LossReport;
@@ -69,7 +69,7 @@ class PublicationImageReceiverFields extends PublicationImagePadding2
 {
     protected boolean isEndOfStream = false;
     protected long lastPacketTimestampNs;
-    protected DestinationImageControlAddress[] controlAddresses = new DestinationImageControlAddress[1];
+    protected ImageConnection[] imageConnections = new ImageConnection[1];
 }
 
 class PublicationImagePadding3 extends PublicationImageReceiverFields
@@ -193,8 +193,8 @@ public class PublicationImage
         timeOfLastStateChangeNs = nowNs;
         lastPacketTimestampNs = nowNs;
 
-        controlAddresses = ArrayUtil.ensureCapacity(controlAddresses, transportIndex + 1);
-        controlAddresses[transportIndex] = new DestinationImageControlAddress(nowNs, controlAddress);
+        imageConnections = ArrayUtil.ensureCapacity(imageConnections, transportIndex + 1);
+        imageConnections[transportIndex] = new ImageConnection(nowNs, controlAddress);
 
         termBuffers = rawLog.termBuffers();
         lossDetector = new LossDetector(lossFeedbackDelayGenerator, this);
@@ -373,28 +373,28 @@ public class PublicationImage
 
     void addDestination(final int transportIndex, final ReceiveDestinationUdpTransport transport)
     {
-        controlAddresses = ArrayUtil.ensureCapacity(controlAddresses, transportIndex + 1);
+        imageConnections = ArrayUtil.ensureCapacity(imageConnections, transportIndex + 1);
 
         if (transport.isMulticast())
         {
-            controlAddresses[transportIndex] =
-                new DestinationImageControlAddress(nanoClock.nanoTime(), transport.udpChannel().remoteControl());
+            imageConnections[transportIndex] = new ImageConnection(
+                cachedNanoClock.nanoTime(), transport.udpChannel().remoteControl());
         }
         else if (transport.hasExplicitControl())
         {
-            controlAddresses[transportIndex] =
-                new DestinationImageControlAddress(nanoClock.nanoTime(), transport.explicitControlAddress());
+            imageConnections[transportIndex] = new ImageConnection(
+                cachedNanoClock.nanoTime(), transport.explicitControlAddress());
         }
     }
 
     void removeDestination(final int transportIndex)
     {
-        controlAddresses[transportIndex] = null;
+        imageConnections[transportIndex] = null;
     }
 
-    void addControlAddressIfUnknown(final int transportIndex, final InetSocketAddress remoteAddress)
+    void addDestinationConnectionIfUnknown(final int transportIndex, final InetSocketAddress remoteAddress)
     {
-        updateControlAddress(transportIndex, remoteAddress, nanoClock.nanoTime());
+        trackConnection(transportIndex, remoteAddress, cachedNanoClock.nanoTime());
     }
 
     private void state(final State state)
@@ -459,14 +459,14 @@ public class PublicationImage
             newRebuildPosition,
             lossFound(scanOutcome));
 
-        final int window = CongestionControlUtil.receiverWindowLength(ccOutcome);
-        final long threshold = CongestionControlUtil.positionThreshold(window);
+        final int windowLength = CongestionControlUtil.receiverWindowLength(ccOutcome);
+        final long threshold = CongestionControlUtil.positionThreshold(windowLength);
 
         if (CongestionControlUtil.shouldForceStatusMessage(ccOutcome) ||
             ((timeOfLastStatusMessageScheduleNs + statusMessageTimeoutNs) - nowNs < 0) ||
             (minSubscriberPosition > (nextSmPosition + threshold)))
         {
-            scheduleStatusMessage(nowNs, minSubscriberPosition, window);
+            scheduleStatusMessage(nowNs, minSubscriberPosition, windowLength);
             cleanBufferTo(minSubscriberPosition - (termLengthMask + 1));
         }
     }
@@ -510,12 +510,14 @@ public class PublicationImage
 
         if (!isFlowControlUnderRun(packetPosition) && !isFlowControlOverRun(proposedPosition))
         {
+            trackConnection(transportIndex, srcAddress, lastPacketTimestampNs);
+
             if (isHeartbeat)
             {
-                if (!isEndOfStream && DataHeaderFlyweight.isEndOfStream(buffer))
+                if (DataHeaderFlyweight.isEndOfStream(buffer) && !isEndOfStream && allEos(transportIndex))
                 {
+                    LogBufferDescriptor.endOfStreamPosition(rawLog.metaData(), proposedPosition);
                     isEndOfStream = true;
-                    LogBufferDescriptor.endOfStreamPosition(rawLog.metaData(), packetPosition);
                 }
 
                 heartbeatsReceived.incrementOrdered();
@@ -528,7 +530,6 @@ public class PublicationImage
 
             lastPacketTimestampNs = cachedNanoClock.nanoTime();
             hwmPosition.proposeMaxOrdered(proposedPosition);
-            updateControlAddress(transportIndex, srcAddress, lastPacketTimestampNs);
         }
 
         return length;
@@ -571,7 +572,7 @@ public class PublicationImage
                 final long smPosition = nextSmPosition;
                 final int receiverWindowLength = nextSmReceiverWindowLength;
 
-                UNSAFE.loadFence(); // LoadLoad required so previous loads don't move past version check below.
+                UNSAFE.loadFence();
 
                 if (changeNumber == beginSmChange)
                 {
@@ -579,7 +580,7 @@ public class PublicationImage
                     final int termOffset = (int)smPosition & termLengthMask;
 
                     channelEndpoint.sendStatusMessage(
-                        controlAddresses, sessionId, streamId, termId, termOffset, receiverWindowLength, (byte)0);
+                        imageConnections, sessionId, streamId, termId, termOffset, receiverWindowLength, (byte)0);
 
                     statusMessagesSent.incrementOrdered();
 
@@ -611,13 +612,13 @@ public class PublicationImage
             final int termOffset = lossTermOffset;
             final int length = lossLength;
 
-            UNSAFE.loadFence(); // LoadLoad required so previous loads don't move past version check below.
+            UNSAFE.loadFence();
 
             if (changeNumber == beginLossChange)
             {
                 if (isReliable)
                 {
-                    channelEndpoint.sendNakMessage(controlAddresses, sessionId, streamId, termId, termOffset, length);
+                    channelEndpoint.sendNakMessage(imageConnections, sessionId, streamId, termId, termOffset, length);
                     nakMessagesSent.incrementOrdered();
                 }
                 else
@@ -652,7 +653,7 @@ public class PublicationImage
         {
             final long preciseTimeNs = nanoClock.nanoTime();
 
-            channelEndpoint.sendRttMeasurement(controlAddresses, sessionId, streamId, preciseTimeNs, 0, true);
+            channelEndpoint.sendRttMeasurement(imageConnections, sessionId, streamId, preciseTimeNs, 0, true);
             congestionControl.onRttMeasurementSent(preciseTimeNs);
 
             workCount = 1;
@@ -664,12 +665,14 @@ public class PublicationImage
     /**
      * Called from the {@link Receiver} upon receiving an RTT Measurement that is a reply.
      *
-     * @param header         of the measurement
+     * @param header         of the measurement message.
      * @param transportIndex that the RTT Measurement came in on.
-     * @param srcAddress     from the sender of the measurement
+     * @param srcAddress     from the sender requesting the measurement
      */
     void onRttMeasurement(
-        final RttMeasurementFlyweight header, final int transportIndex, final InetSocketAddress srcAddress)
+        final RttMeasurementFlyweight header,
+        @SuppressWarnings("unused") final int transportIndex,
+        final InetSocketAddress srcAddress)
     {
         final long nowNs = nanoClock.nanoTime();
         final long rttInNs = nowNs - header.echoTimestampNs() - header.receptionDelta();
@@ -702,7 +705,7 @@ public class PublicationImage
         switch (state)
         {
             case INACTIVE:
-                if (isDrained() || ((timeOfLastStateChangeNs + imageLivenessTimeoutNs) - timeNs < 0))
+                if (isDrained())
                 {
                     state = State.LINGER;
                     timeOfLastStateChangeNs = timeNs;
@@ -780,16 +783,31 @@ public class PublicationImage
         }
     }
 
-    private void updateControlAddress(final int transportIndex, final InetSocketAddress srcAddress, final long nowNs)
+    private void trackConnection(final int transportIndex, final InetSocketAddress srcAddress, final long nowNs)
     {
-        DestinationImageControlAddress controlAddress = controlAddresses[transportIndex];
+        ImageConnection imageConnection = imageConnections[transportIndex];
 
-        if (null == controlAddress)
+        if (null == imageConnection)
         {
-            controlAddress = new DestinationImageControlAddress(nowNs, srcAddress);
-            controlAddresses[transportIndex] = controlAddress;
+            imageConnection = new ImageConnection(nowNs, srcAddress);
+            imageConnections[transportIndex] = imageConnection;
         }
 
-        controlAddress.timeOfLastFrameNs = nowNs;
+        imageConnection.timeOfLastFrameNs = nowNs;
+    }
+
+    private boolean allEos(final int transportIndex)
+    {
+        imageConnections[transportIndex].isEos = true;
+
+        for (final ImageConnection imageConnection : imageConnections)
+        {
+            if (null != imageConnection && !imageConnection.isEos)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

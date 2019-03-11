@@ -1,5 +1,5 @@
 #
-# Copyright 2014-2018 Real Logic Ltd.
+# Copyright 2014-2019 Real Logic Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ SET(HEADERS
     ControlledFragmentAssembler.h
     ExclusivePublication.h
     Counter.h
+    ChannelUri.h
+    ChannelUriStringBuilder.h
     command/ImageMessageFlyweight.h
     command/ImageBuffersReadyFlyweight.h
     command/ControlProtocolEvents.h
@@ -57,6 +59,7 @@ SET(HEADERS
     command/OperationSucceededFlyweight.h
     command/CounterMessageFlyweight.h
     command/CounterUpdateFlyweight.h
+    command/ClientTimeoutFlyweight.h
     concurrent/AgentRunner.h
     concurrent/AgentInvoker.h
     concurrent/Atomic64.h
@@ -68,6 +71,7 @@ SET(HEADERS
     concurrent/NoOpIdleStrategy.h
     concurrent/SleepingIdleStrategy.h
     concurrent/YieldingIdleStrategy.h
+    concurrent/BackOffIdleStrategy.h
     concurrent/atomic/Atomic64_gcc_cpp11.h
     concurrent/atomic/Atomic64_gcc_x86_64.h
     concurrent/atomic/Atomic64_msvc.h
@@ -92,7 +96,6 @@ SET(HEADERS
     concurrent/logbuffer/TermReader.h
     concurrent/logbuffer/TermScanner.h
     concurrent/logbuffer/ExclusiveTermAppender.h
-    concurrent/logbuffer/ExclusiveBufferClaim.h
     concurrent/ringbuffer/ManyToOneRingBuffer.h
     concurrent/ringbuffer/RecordDescriptor.h
     concurrent/ringbuffer/RingBufferDescriptor.h
@@ -127,9 +130,14 @@ target_include_directories(aeron_client
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# relative file paths for use in exceptions
+target_compile_definitions(aeron_client
+    PUBLIC "__PROJECT_SOURCE_DIR__=\"${PROJECT_SOURCE_DIR}\""
+)
+
 if (NOT WIN32)
-	set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-	set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+    set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+    set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 endif()
 
 target_link_libraries(aeron_client

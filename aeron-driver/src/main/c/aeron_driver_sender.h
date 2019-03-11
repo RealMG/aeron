@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_DRIVER_SENDER_H
-#define AERON_AERON_DRIVER_SENDER_H
+#ifndef AERON_DRIVER_SENDER_H
+#define AERON_DRIVER_SENDER_H
 
+#include "aeron_socket.h"
 #include "aeron_driver_context.h"
 #include "aeron_driver_sender_proxy.h"
 #include "aeron_system_counters.h"
@@ -99,4 +100,4 @@ void aeron_driver_sender_on_remove_destination(void *clientd, void *command);
 
 int aeron_driver_sender_do_send(aeron_driver_sender_t *sender, int64_t now_ns);
 
-#endif //AERON_AERON_DRIVER_SENDER_H
+#endif //AERON_DRIVER_SENDER_H

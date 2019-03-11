@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDED_AERON_COMMAND_STATUSMESSAGEFLYWEIGHT__
-#define INCLUDED_AERON_COMMAND_STATUSMESSAGEFLYWEIGHT__
+#ifndef AERON_STATUS_MESSAGE_FLYWEIGHT_H
+#define AERON_STATUS_MESSAGE_FLYWEIGHT_H
 
 #include <cstdint>
 #include <string>
@@ -150,4 +150,4 @@ private:
 
 }}
 
-#endif //AERON_STATUSMESSAGEFLYWEIGHT_H
+#endif

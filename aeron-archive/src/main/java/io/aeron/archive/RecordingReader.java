@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import static java.nio.ByteOrder.LITTLE_ENDIAN;
 import static java.nio.channels.FileChannel.MapMode.READ_ONLY;
 import static java.nio.file.StandardOpenOption.*;
 
-class RecordingFragmentReader implements AutoCloseable
+class RecordingReader implements AutoCloseable
 {
     private static final EnumSet<StandardOpenOption> FILE_OPTIONS = EnumSet.of(READ);
     private static final FileAttribute<?>[] NO_ATTRIBUTES = new FileAttribute[0];
@@ -65,7 +65,7 @@ class RecordingFragmentReader implements AutoCloseable
     private int segmentFileIndex;
     private boolean isDone = false;
 
-    RecordingFragmentReader(
+    RecordingReader(
         final Catalog catalog,
         final RecordingSummary recordingSummary,
         final File archiveDir,
@@ -79,11 +79,12 @@ class RecordingFragmentReader implements AutoCloseable
         this.termLength = recordingSummary.termBufferLength;
         this.segmentLength = recordingSummary.segmentFileLength;
         this.recordingId = recordingSummary.recordingId;
+        this.stopPosition = null == recordingPosition ? recordingSummary.stopPosition : recordingPosition.get();
 
         final long startPosition = recordingSummary.startPosition;
         final long fromPosition = position == NULL_POSITION ? startPosition : position;
-        stopPosition = null == recordingPosition ? recordingSummary.stopPosition : recordingPosition.get();
         final long maxLength = null == recordingPosition ? stopPosition - fromPosition : Long.MAX_VALUE - fromPosition;
+
         final long replayLength = length == AeronArchive.NULL_LENGTH ? maxLength : Math.min(length, maxLength);
         if (replayLength < 0)
         {
@@ -99,21 +100,22 @@ class RecordingFragmentReader implements AutoCloseable
             }
         }
 
-        segmentFileIndex = segmentFileIndex(startPosition, fromPosition, segmentLength);
-        openRecordingSegment();
-
         final int positionBitsToShift = LogBufferDescriptor.positionBitsToShift(termLength);
         final long startTermBasePosition = startPosition - (startPosition & (termLength - 1));
         final int segmentOffset = (int)(fromPosition - startTermBasePosition) & (segmentLength - 1);
         final int termId = ((int)(fromPosition >> positionBitsToShift) + recordingSummary.initialTermId);
 
+        segmentFileIndex = segmentFileIndex(startPosition, fromPosition, segmentLength);
+        openRecordingSegment();
+
         termOffset = (int)(fromPosition & (termLength - 1));
         termBaseSegmentOffset = segmentOffset - termOffset;
         termBuffer = new UnsafeBuffer(mappedSegmentBuffer, termBaseSegmentOffset, termLength);
 
-        if (fromPosition > startPosition &&
-            fromPosition != stopPosition &&
-            isFragmentAligned(termBuffer, recordingSummary.streamId, termId, termOffset))
+        if (fromPosition > startPosition && fromPosition != stopPosition &&
+            (DataHeaderFlyweight.termOffset(termBuffer, termOffset) != termOffset ||
+            DataHeaderFlyweight.termId(termBuffer, termOffset) != termId ||
+            DataHeaderFlyweight.streamId(termBuffer, termOffset) != recordingSummary.streamId))
         {
             close();
             throw new IllegalArgumentException(fromPosition + " position not aligned to valid fragment");
@@ -138,7 +140,7 @@ class RecordingFragmentReader implements AutoCloseable
         return isDone;
     }
 
-    int controlledPoll(final SimpleFragmentHandler fragmentHandler, final int fragmentLimit)
+    int poll(final SimpleFragmentHandler fragmentHandler, final int fragmentLimit)
     {
         int fragments = 0;
 
@@ -165,10 +167,7 @@ class RecordingFragmentReader implements AutoCloseable
             final int dataOffset = frameOffset + DataHeaderFlyweight.HEADER_LENGTH;
             final int dataLength = frameLength - DataHeaderFlyweight.HEADER_LENGTH;
 
-            if (!fragmentHandler.onFragment(termBuffer, dataOffset, dataLength, frameType, flags, reservedValue))
-            {
-                break;
-            }
+            fragmentHandler.onFragment(termBuffer, dataOffset, dataLength, frameType, flags, reservedValue);
 
             replayPosition += alignedLength;
             termOffset += alignedLength;
@@ -249,14 +248,5 @@ class RecordingFragmentReader implements AutoCloseable
         {
             LangUtil.rethrowUnchecked(ex);
         }
-    }
-
-    private static boolean isFragmentAligned(
-        final UnsafeBuffer buffer, final int streamId, final int termId, final int termOffset)
-    {
-        return
-            DataHeaderFlyweight.termOffset(buffer, termOffset) != termOffset ||
-            DataHeaderFlyweight.termId(buffer, termOffset) != termId ||
-            DataHeaderFlyweight.streamId(buffer, termOffset) != streamId;
     }
 }

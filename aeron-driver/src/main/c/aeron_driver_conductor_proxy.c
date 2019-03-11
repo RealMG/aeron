@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <sched.h>
 #include "concurrent/aeron_counters_manager.h"
 #include "aeron_driver_conductor_proxy.h"
 #include "aeron_alloc.h"
+#include "concurrent/aeron_thread.h"
 #include "aeron_driver_conductor.h"
 
 void aeron_driver_conductor_proxy_offer(aeron_driver_conductor_proxy_t *conductor_proxy, void *cmd)
@@ -62,8 +62,7 @@ void aeron_driver_conductor_proxy_on_create_publication_image_cmd(
     {
         aeron_command_create_publication_image_t cmd =
             {
-                .base.func = aeron_driver_conductor_on_create_publication_image,
-                .base.item = NULL,
+                .base = { .func = aeron_driver_conductor_on_create_publication_image, .item = NULL },
                 .session_id = session_id,
                 .stream_id = stream_id,
                 .initial_term_id = initial_term_id,

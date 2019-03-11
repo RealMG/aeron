@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import org.agrona.concurrent.status.CountersReader;
 import java.util.Collection;
 
 import static io.aeron.Aeron.NULL_VALUE;
+import static io.aeron.archive.client.AeronArchive.NULL_POSITION;
 import static io.aeron.archive.codecs.SourceLocation.LOCAL;
 import static java.util.Collections.unmodifiableCollection;
 import static org.agrona.concurrent.status.CountersReader.NULL_COUNTER_ID;
@@ -42,7 +43,6 @@ class ClusteredServiceAgent implements Agent, Cluster
         MessageHeaderDecoder.ENCODED_LENGTH + SessionHeaderDecoder.BLOCK_LENGTH;
 
     private final int serviceId;
-    private boolean isRecovering;
     private final AeronArchive.Context archiveCtx;
     private final ClusteredServiceContainer.Context ctx;
     private final Aeron aeron;
@@ -55,12 +55,16 @@ class ClusteredServiceAgent implements Agent, Cluster
     private final EpochClock epochClock;
     private final ClusterMarkFile markFile;
     private final UnsafeBuffer headerBuffer = new UnsafeBuffer(new byte[SESSION_HEADER_LENGTH]);
+    private final DirectBufferVector headerVector = new DirectBufferVector(headerBuffer, 0, headerBuffer.capacity());
     private final EgressMessageHeaderEncoder egressMessageHeaderEncoder = new EgressMessageHeaderEncoder();
 
     private long ackId = 0;
     private long clusterTimeMs;
     private long cachedTimeMs;
+    private long terminationPosition = NULL_POSITION;
+    private long roleChangePosition = NULL_POSITION;
     private int memberId = NULL_VALUE;
+    private boolean isServiceActive;
     private BoundedLogAdapter logAdapter;
     private AtomicCounter heartbeatCounter;
     private ReadableCounter roleCounter;
@@ -96,30 +100,42 @@ class ClusteredServiceAgent implements Agent, Cluster
         commitPosition = awaitCommitPositionCounter(counters);
 
         service.onStart(this);
-
-        isRecovering = true;
+        isServiceActive = true;
 
         final int recoveryCounterId = awaitRecoveryCounter(counters);
         heartbeatCounter.setOrdered(epochClock.time());
         checkForSnapshot(counters, recoveryCounterId);
         checkForReplay(counters, recoveryCounterId);
-
-        isRecovering = false;
     }
 
     public void onClose()
     {
+        if (isServiceActive)
+        {
+            isServiceActive = false;
+            try
+            {
+                service.onTerminate(this);
+            }
+            catch (final Exception ex)
+            {
+                ctx.countedErrorHandler().onError(ex);
+            }
+        }
+
         if (!ctx.ownsAeronClient())
         {
-            CloseHelper.close(logAdapter);
-            CloseHelper.close(consensusModuleProxy);
-            CloseHelper.close(serviceAdapter);
-
             for (final ClientSession session : sessionByIdMap.values())
             {
                 session.disconnect();
             }
+
+            CloseHelper.close(logAdapter);
+            CloseHelper.close(serviceAdapter);
+            CloseHelper.close(consensusModuleProxy);
         }
+
+        ctx.close();
     }
 
     public int doWork()
@@ -134,6 +150,7 @@ class ClusteredServiceAgent implements Agent, Cluster
 
         if (null != logAdapter)
         {
+            // TODO: limit consumption up to roleChangePosition if set.
             final int polled = logAdapter.poll();
             if (0 == polled)
             {
@@ -168,6 +185,11 @@ class ClusteredServiceAgent implements Agent, Cluster
     public Aeron aeron()
     {
         return aeron;
+    }
+
+    public ClusteredServiceContainer.Context context()
+    {
+        return ctx;
     }
 
     public ClientSession getClientSession(final long clusterSessionId)
@@ -255,6 +277,30 @@ class ClusteredServiceAgent implements Agent, Cluster
         return publication.offer(headerBuffer, 0, headerBuffer.capacity(), buffer, offset, length, null);
     }
 
+    public long offer(final long clusterSessionId, final Publication publication, final DirectBufferVector[] vectors)
+    {
+        if (role != Cluster.Role.LEADER)
+        {
+            return ClientSession.MOCKED_OFFER;
+        }
+
+        if (null == publication)
+        {
+            return Publication.NOT_CONNECTED;
+        }
+
+        egressMessageHeaderEncoder
+            .clusterSessionId(clusterSessionId)
+            .timestamp(clusterTimeMs);
+
+        if (vectors[0] != headerVector)
+        {
+            vectors[0] = headerVector;
+        }
+
+        return publication.offer(vectors, null);
+    }
+
     public void onJoinLog(
         final long leadershipTermId,
         final long logPosition,
@@ -270,8 +316,19 @@ class ClusteredServiceAgent implements Agent, Cluster
             logAdapter = null;
         }
 
+        roleChangePosition = NULL_POSITION;
         activeLogEvent = new ActiveLogEvent(
             leadershipTermId, logPosition, maxLogPosition, memberId, logSessionId, logStreamId, logChannel);
+    }
+
+    public void onServiceTerminationPosition(final long logPosition)
+    {
+        terminationPosition = logPosition;
+    }
+
+    public void onElectionStartEvent(final long logPosition)
+    {
+        roleChangePosition = logPosition;
     }
 
     void onSessionMessage(
@@ -295,6 +352,8 @@ class ClusteredServiceAgent implements Agent, Cluster
     }
 
     void onSessionOpen(
+        final long leadershipTermId,
+        final long logPosition,
         final long clusterSessionId,
         final long timestampMs,
         final int responseStreamId,
@@ -302,6 +361,13 @@ class ClusteredServiceAgent implements Agent, Cluster
         final byte[] encodedPrincipal)
     {
         clusterTimeMs = timestampMs;
+
+        if (sessionByIdMap.containsKey(clusterSessionId))
+        {
+            throw new ClusterException("clashing open clusterSessionId=" + clusterSessionId +
+                " leadershipTermId=" + leadershipTermId + " logPosition=" + logPosition);
+        }
+
         final ClientSession session = new ClientSession(
             clusterSessionId, responseStreamId, responseChannel, encodedPrincipal, this);
 
@@ -314,16 +380,29 @@ class ClusteredServiceAgent implements Agent, Cluster
         service.onSessionOpen(session, timestampMs);
     }
 
-    void onSessionClose(final long clusterSessionId, final long timestampMs, final CloseReason closeReason)
+    void onSessionClose(
+        final long leadershipTermId,
+        final long logPosition,
+        final long clusterSessionId,
+        final long timestampMs,
+        final CloseReason closeReason)
     {
         clusterTimeMs = timestampMs;
         final ClientSession session = sessionByIdMap.remove(clusterSessionId);
+
+        if (null == session)
+        {
+            throw new ClusterException(
+                "unknown clusterSessionId=" + clusterSessionId + " for close reason=" + closeReason +
+                " leadershipTermId=" + leadershipTermId + " logPosition=" + logPosition);
+        }
+
         session.disconnect();
         service.onSessionClose(session, timestampMs, closeReason);
     }
 
     void onServiceAction(
-        final long logPosition, final long leadershipTermId, final long timestampMs, final ClusterAction action)
+        final long leadershipTermId, final long logPosition, final long timestampMs, final ClusterAction action)
     {
         clusterTimeMs = timestampMs;
         executeAction(action, logPosition, leadershipTermId);
@@ -342,22 +421,21 @@ class ClusteredServiceAgent implements Agent, Cluster
     }
 
     @SuppressWarnings("unused")
-    void onClusterChange(
+    void onMembershipChange(
         final long leadershipTermId,
         final long logPosition,
         final long timestampMs,
         final int leaderMemberId,
         final int clusterSize,
-        final ChangeType eventType,
+        final ChangeType changeType,
         final int memberId,
         final String clusterMembers)
     {
         clusterTimeMs = timestampMs;
 
-        if (memberId == this.memberId && eventType == ChangeType.LEAVE)
+        if (memberId == this.memberId && changeType == ChangeType.QUIT)
         {
-            consensusModuleProxy.ack(logPosition, ackId++, serviceId);
-            ctx.terminationHook().run();
+            terminate(logPosition);
         }
     }
 
@@ -369,6 +447,11 @@ class ClusteredServiceAgent implements Agent, Cluster
     {
         sessionByIdMap.put(clusterSessionId, new ClientSession(
             clusterSessionId, responseStreamId, responseChannel, encodedPrincipal, this));
+    }
+
+    void handleError(final Throwable ex)
+    {
+        ctx.countedErrorHandler().onError(ex);
     }
 
     private void role(final Role newRole)
@@ -403,7 +486,6 @@ class ClusteredServiceAgent implements Agent, Cluster
             try (Subscription subscription = aeron.addSubscription(activeLogEvent.channel, activeLogEvent.streamId))
             {
                 consensusModuleProxy.ack(activeLogEvent.logPosition, ackId++, serviceId);
-
 
                 final Image image = awaitImage(activeLogEvent.sessionId, subscription);
                 final BoundedLogAdapter adapter = new BoundedLogAdapter(image, commitPosition, this);
@@ -669,26 +751,9 @@ class ClusteredServiceAgent implements Agent, Cluster
 
     private void executeAction(final ClusterAction action, final long position, final long leadershipTermId)
     {
-        if (isRecovering)
+        if (ClusterAction.SNAPSHOT == action)
         {
-            return;
-        }
-
-        switch (action)
-        {
-            case SNAPSHOT:
-                consensusModuleProxy.ack(position, ackId++, onTakeSnapshot(position, leadershipTermId), serviceId);
-                break;
-
-            case SHUTDOWN:
-                consensusModuleProxy.ack(position, ackId++, onTakeSnapshot(position, leadershipTermId), serviceId);
-                ctx.terminationHook().run();
-                break;
-
-            case ABORT:
-                consensusModuleProxy.ack(position, ackId++, serviceId);
-                ctx.terminationHook().run();
-                break;
+            consensusModuleProxy.ack(position, ackId++, onTakeSnapshot(position, leadershipTermId), serviceId);
         }
     }
 
@@ -729,7 +794,7 @@ class ClusteredServiceAgent implements Agent, Cluster
             }
             else
             {
-                ctx.errorHandler().onError(new ClusterException("Consensus Module not connected"));
+                ctx.countedErrorHandler().onError(new ClusterException("Consensus Module not connected"));
                 ctx.terminationHook().run();
             }
 
@@ -747,5 +812,50 @@ class ClusteredServiceAgent implements Agent, Cluster
         {
             joinActiveLog();
         }
+
+        if (NULL_POSITION != terminationPosition)
+        {
+            checkForTermination();
+        }
+
+        if (NULL_POSITION != roleChangePosition)
+        {
+            checkForRoleChange();
+        }
+    }
+
+    private void checkForTermination()
+    {
+        if (null != logAdapter && logAdapter.position() >= terminationPosition)
+        {
+            final long logPosition = terminationPosition;
+            terminationPosition = NULL_VALUE;
+            terminate(logPosition);
+        }
+    }
+
+    private void checkForRoleChange()
+    {
+        if (null != logAdapter && logAdapter.position() >= roleChangePosition)
+        {
+            roleChangePosition = NULL_VALUE;
+            role(Role.get((int)roleCounter.get()));
+        }
+    }
+
+    private void terminate(final long logPosition)
+    {
+        isServiceActive = false;
+        try
+        {
+            service.onTerminate(this);
+        }
+        catch (final Exception ex)
+        {
+            ctx.countedErrorHandler().onError(ex);
+        }
+
+        consensusModuleProxy.ack(logPosition, ackId++, serviceId);
+        ctx.terminationHook().run();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import io.aeron.logbuffer.Header;
 import org.agrona.DirectBuffer;
 import org.agrona.IoUtil;
 import org.agrona.LangUtil;
+import org.agrona.SystemUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SigInt;
@@ -136,7 +137,7 @@ public class FileReceiver
         }
         else
         {
-            storageDir = new File(IoUtil.tmpDirName());
+            storageDir = new File(SystemUtil.tmpDirName());
         }
 
         System.out.println("Files stored to " + storageDir.getAbsolutePath());

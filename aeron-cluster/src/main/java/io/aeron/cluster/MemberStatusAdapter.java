@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,8 @@ class MemberStatusAdapter implements FragmentHandler, AutoCloseable
     private final SnapshotRecordingQueryDecoder snapshotRecordingQueryDecoder = new SnapshotRecordingQueryDecoder();
     private final SnapshotRecordingsDecoder snapshotRecordingsDecoder = new SnapshotRecordingsDecoder();
     private final JoinClusterDecoder joinClusterDecoder = new JoinClusterDecoder();
+    private final TerminationPositionDecoder terminationPositionDecoder = new TerminationPositionDecoder();
+    private final TerminationAckDecoder terminationAckDecoder = new TerminationAckDecoder();
 
     private final FragmentAssembler fragmentAssembler = new FragmentAssembler(this);
     private final Subscription subscription;
@@ -73,6 +75,12 @@ class MemberStatusAdapter implements FragmentHandler, AutoCloseable
     public void onFragment(final DirectBuffer buffer, final int offset, final int length, final Header header)
     {
         messageHeaderDecoder.wrap(buffer, offset);
+
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
+        {
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
 
         final int templateId = messageHeaderDecoder.templateId();
         switch (templateId)
@@ -131,6 +139,7 @@ class MemberStatusAdapter implements FragmentHandler, AutoCloseable
                     newLeadershipTermDecoder.logLeadershipTermId(),
                     newLeadershipTermDecoder.logPosition(),
                     newLeadershipTermDecoder.leadershipTermId(),
+                    newLeadershipTermDecoder.maxLogPosition(),
                     newLeadershipTermDecoder.leaderMemberId(),
                     newLeadershipTermDecoder.logSessionId());
                 break;
@@ -182,7 +191,8 @@ class MemberStatusAdapter implements FragmentHandler, AutoCloseable
                     messageHeaderDecoder.version());
 
                 memberStatusListener.onStopCatchup(
-                    stopCatchupDecoder.replaySessionId(),
+                    stopCatchupDecoder.leadershipTermId(),
+                    stopCatchupDecoder.logPosition(),
                     stopCatchupDecoder.followerMemberId());
                 break;
 
@@ -244,8 +254,26 @@ class MemberStatusAdapter implements FragmentHandler, AutoCloseable
                     joinClusterDecoder.leadershipTermId(), joinClusterDecoder.memberId());
                 break;
 
-            default:
-                throw new ClusterException("unknown template id: " + templateId);
+            case TerminationPositionDecoder.TEMPLATE_ID:
+                terminationPositionDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    messageHeaderDecoder.blockLength(),
+                    messageHeaderDecoder.version());
+
+                memberStatusListener.onTerminationPosition(terminationPositionDecoder.logPosition());
+                break;
+
+            case TerminationAckDecoder.TEMPLATE_ID:
+                terminationAckDecoder.wrap(
+                    buffer,
+                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                    messageHeaderDecoder.blockLength(),
+                    messageHeaderDecoder.version());
+
+                memberStatusListener.onTerminationAck(
+                    terminationAckDecoder.logPosition(), terminationAckDecoder.memberId());
+                break;
         }
     }
 }

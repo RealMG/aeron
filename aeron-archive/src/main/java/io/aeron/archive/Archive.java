@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import java.util.function.Supplier;
 import static io.aeron.driver.status.SystemCounterDescriptor.SYSTEM_COUNTER_TYPE_ID;
 import static io.aeron.logbuffer.LogBufferDescriptor.TERM_MAX_LENGTH;
 import static io.aeron.logbuffer.LogBufferDescriptor.TERM_MIN_LENGTH;
+import static java.lang.System.getProperty;
 import static org.agrona.SystemUtil.getDurationInNanos;
 import static org.agrona.SystemUtil.getSizeAsInt;
 import static org.agrona.SystemUtil.loadPropertiesFiles;
@@ -106,7 +107,6 @@ public class Archive implements AutoCloseable
     {
         CloseHelper.close(conductorInvoker);
         CloseHelper.close(conductorRunner);
-        CloseHelper.close(ctx);
     }
 
     private Archive start()
@@ -179,13 +179,10 @@ public class Archive implements AutoCloseable
         public static final String DEFAULT_IDLE_STRATEGY = "org.agrona.concurrent.BackoffIdleStrategy";
 
         public static final String MAX_CONCURRENT_RECORDINGS_PROP_NAME = "aeron.archive.max.concurrent.recordings";
-        public static final int MAX_CONCURRENT_RECORDINGS_DEFAULT = 128;
+        public static final int MAX_CONCURRENT_RECORDINGS_DEFAULT = 50;
 
         public static final String MAX_CONCURRENT_REPLAYS_PROP_NAME = "aeron.archive.max.concurrent.replays";
-        public static final int MAX_CONCURRENT_REPLAYS_DEFAULT = 128;
-
-        public static final String REPLAY_FRAGMENT_LIMIT_PROP_NAME = "aeron.archive.replay.fragment.limit";
-        public static final int REPLAY_FRAGMENT_LIMIT_DEFAULT = 64;
+        public static final int MAX_CONCURRENT_REPLAYS_DEFAULT = 50;
 
         public static final String MAX_CATALOG_ENTRIES_PROP_NAME = "aeron.archive.max.catalog.entries";
         public static final long MAX_CATALOG_ENTRIES_DEFAULT = Catalog.DEFAULT_MAX_ENTRIES;
@@ -193,8 +190,15 @@ public class Archive implements AutoCloseable
         public static final String CONNECT_TIMEOUT_PROP_NAME = "aeron.archive.connect.timeout";
         public static final long CONNECT_TIMEOUT_DEFAULT_NS = TimeUnit.SECONDS.toNanos(5);
 
+        public static final String REPLAY_LINGER_TIMEOUT_PROP_NAME = "aeron.archive.replay.linger.timeout";
+        public static final long REPLAY_LINGER_TIMEOUT_DEFAULT_NS =
+            io.aeron.driver.Configuration.publicationLingerTimeoutNs();
+
+        public static final String ARCHIVE_DIR_DELETE_ON_START_PROP_NAME = "aeron.archive.dir.delete.on.start";
+
         static final String CATALOG_FILE_NAME = "archive.catalog";
         static final String RECORDING_SEGMENT_POSTFIX = ".rec";
+        static final int MAX_BLOCK_LENGTH = 2 * 1024 * 1024;
 
         /**
          * Get the directory name to be used for storing the archive.
@@ -295,16 +299,6 @@ public class Archive implements AutoCloseable
         }
 
         /**
-         * Limit for the number of fragments to be replayed per duty cycle on a replay.
-         *
-         * @return the limit for the number of fragments to be replayed per duty cycle on a replay.
-         */
-        public static int replayFragmentLimit()
-        {
-            return Integer.getInteger(REPLAY_FRAGMENT_LIMIT_PROP_NAME, REPLAY_FRAGMENT_LIMIT_DEFAULT);
-        }
-
-        /**
          * Maximum number of catalog entries to allocate for the catalog file.
          *
          * @return the maximum number of catalog entries to support for the catalog file.
@@ -324,14 +318,40 @@ public class Archive implements AutoCloseable
         {
             return getDurationInNanos(CONNECT_TIMEOUT_PROP_NAME, CONNECT_TIMEOUT_DEFAULT_NS);
         }
+
+        /**
+         * The timeout in nanoseconds to for a replay network publication to linger after draining.
+         *
+         * @return timeout in nanoseconds for a replay network publication to wait in linger.
+         * @see #REPLAY_LINGER_TIMEOUT_PROP_NAME
+         * @see io.aeron.driver.Configuration#PUBLICATION_LINGER_PROP_NAME
+         */
+        public static long replayLingerTimeoutNs()
+        {
+            return getDurationInNanos(REPLAY_LINGER_TIMEOUT_PROP_NAME, REPLAY_LINGER_TIMEOUT_DEFAULT_NS);
+        }
+
+        /**
+         * Whether to delete directory on start or not.
+         *
+         * @return whether to delete directory on start or not.
+         * @see #ARCHIVE_DIR_DELETE_ON_START_PROP_NAME
+         */
+        public static boolean deleteArchiveOnStart()
+        {
+            return "true".equalsIgnoreCase(getProperty(ARCHIVE_DIR_DELETE_ON_START_PROP_NAME, "false"));
+        }
     }
 
     /**
      * Overrides for the defaults and system properties.
+     * <p>
+     * The context will be owned by {@link ArchiveConductor} after a successful
+     * {@link Archive#launch(Context)} and closed via {@link Archive#close()}.
      */
-    public static class Context implements AutoCloseable, Cloneable
+    public static class Context implements Cloneable
     {
-        private boolean deleteArchiveOnStart = false;
+        private boolean deleteArchiveOnStart = Configuration.deleteArchiveOnStart();
         private boolean ownsAeronClient = false;
         private String aeronDirectoryName = CommonContext.getAeronDirectoryName();
         private Aeron aeron;
@@ -352,6 +372,7 @@ public class Archive implements AutoCloseable
         private int recordingEventsStreamId = AeronArchive.Configuration.recordingEventsStreamId();
 
         private long connectTimeoutNs = Configuration.connectTimeoutNs();
+        private long replayLingerTimeoutNs = Configuration.replayLingerTimeoutNs();
         private long maxCatalogEntries = Configuration.maxCatalogEntries();
         private int segmentFileLength = Configuration.segmentFileLength();
         private int fileSyncLevel = Configuration.fileSyncLevel();
@@ -651,7 +672,7 @@ public class Archive implements AutoCloseable
          *
          * @param controlTermBufferSparse for the control stream.
          * @return this for a fluent API.
-         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_SPARSE_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_SPARSE_PROP_NAME
          */
         public Context controlTermBufferSparse(final boolean controlTermBufferSparse)
         {
@@ -663,7 +684,7 @@ public class Archive implements AutoCloseable
          * Should the control streams use sparse file term buffers.
          *
          * @return true if the control stream should use sparse file term buffers.
-         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_SPARSE_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_SPARSE_PROP_NAME
          */
         public boolean controlTermBufferSparse()
         {
@@ -675,7 +696,7 @@ public class Archive implements AutoCloseable
          *
          * @param controlTermBufferLength for the control streams.
          * @return this for a fluent API.
-         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_LENGTH_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_LENGTH_PROP_NAME
          */
         public Context controlTermBufferLength(final int controlTermBufferLength)
         {
@@ -687,7 +708,7 @@ public class Archive implements AutoCloseable
          * Get the term buffer length for the control streams.
          *
          * @return the term buffer length for the control streams.
-         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_LENGTH_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_TERM_BUFFER_LENGTH_PROP_NAME
          */
         public int controlTermBufferLength()
         {
@@ -699,7 +720,7 @@ public class Archive implements AutoCloseable
          *
          * @param controlMtuLength for the control streams.
          * @return this for a fluent API.
-         * @see AeronArchive.Configuration#CONTROL_MTU_LENGTH_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_MTU_LENGTH_PROP_NAME
          */
         public Context controlMtuLength(final int controlMtuLength)
         {
@@ -711,7 +732,7 @@ public class Archive implements AutoCloseable
          * Get the MTU length for the control streams.
          *
          * @return the MTU length for the control streams.
-         * @see AeronArchive.Configuration#CONTROL_MTU_LENGTH_PARAM_NAME
+         * @see AeronArchive.Configuration#CONTROL_MTU_LENGTH_PROP_NAME
          */
         public int controlMtuLength()
         {
@@ -805,6 +826,32 @@ public class Archive implements AutoCloseable
         public long connectTimeoutNs()
         {
             return connectTimeoutNs;
+        }
+
+        /**
+         * The timeout in nanoseconds for or a replay publication to linger after draining.
+         *
+         * @param replayLingerTimeoutNs in nanoseconds for a replay publication to linger after draining.
+         * @return this for a fluent API.
+         * @see Configuration#REPLAY_LINGER_TIMEOUT_PROP_NAME
+         * @see io.aeron.driver.Configuration#PUBLICATION_LINGER_PROP_NAME
+         */
+        public Context replayLingerTimeoutNs(final long replayLingerTimeoutNs)
+        {
+            this.replayLingerTimeoutNs = replayLingerTimeoutNs;
+            return this;
+        }
+
+        /**
+         * The timeout in nanoseconds for a replay publication to linger after draining.
+         *
+         * @return the timeout in nanoseconds for a replay publication to linger after draining.
+         * @see Configuration#REPLAY_LINGER_TIMEOUT_PROP_NAME
+         * @see io.aeron.driver.Configuration#PUBLICATION_LINGER_PROP_NAME
+         */
+        public long replayLingerTimeoutNs()
+        {
+            return replayLingerTimeoutNs;
         }
 
         /**
@@ -1079,7 +1126,7 @@ public class Archive implements AutoCloseable
          */
         public int maxConcurrentRecordings()
         {
-            return this.maxConcurrentRecordings;
+            return maxConcurrentRecordings;
         }
 
         /**
@@ -1101,7 +1148,7 @@ public class Archive implements AutoCloseable
          */
         public int maxConcurrentReplays()
         {
-            return this.maxConcurrentReplays;
+            return maxConcurrentReplays;
         }
 
         /**
@@ -1281,6 +1328,7 @@ public class Archive implements AutoCloseable
             CloseHelper.close(catalog);
             CloseHelper.close(markFile);
             CloseHelper.close(archiveDirChannel);
+            archiveDirChannel = null;
         }
     }
 

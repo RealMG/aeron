@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,10 +73,9 @@ public class UnicastFlowControl implements FlowControl
     /**
      * {@inheritDoc}
      */
-    public long onIdle(
-        final long timeNs, final long senderLimit, final long senderPosition, final boolean isEndOfStream)
+    public long onIdle(final long timeNs, final long senderLimit, final long senderPosition, final boolean isEos)
     {
-        if (isEndOfStream && shouldLinger)
+        if (isEos && shouldLinger)
         {
             if (lastPosition >= senderPosition || ((timeOfLastStatusMessage + RECEIVER_TIMEOUT_NS) - timeNs < 0))
             {

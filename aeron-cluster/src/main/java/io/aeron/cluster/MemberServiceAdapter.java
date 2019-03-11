@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@
 package io.aeron.cluster;
 
 import io.aeron.Subscription;
-import io.aeron.cluster.codecs.ClusterMembersResponseDecoder;
-import io.aeron.cluster.codecs.JoinLogDecoder;
-import io.aeron.cluster.codecs.MessageHeaderDecoder;
+import io.aeron.cluster.client.ClusterException;
+import io.aeron.cluster.codecs.*;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
 import org.agrona.CloseHelper;
@@ -58,26 +57,26 @@ class MemberServiceAdapter implements FragmentHandler, AutoCloseable
     {
         messageHeaderDecoder.wrap(buffer, offset);
 
-        final int templateId = messageHeaderDecoder.templateId();
-
-        switch (templateId)
+        final int schemaId = messageHeaderDecoder.schemaId();
+        if (schemaId != MessageHeaderDecoder.SCHEMA_ID)
         {
-            case JoinLogDecoder.TEMPLATE_ID:
-                break;
+            throw new ClusterException("expected schemaId=" + MessageHeaderDecoder.SCHEMA_ID + ", actual=" + schemaId);
+        }
 
-            case ClusterMembersResponseDecoder.TEMPLATE_ID:
-                clusterMembersResponseDecoder.wrap(
-                    buffer,
-                    offset + MessageHeaderDecoder.ENCODED_LENGTH,
-                    messageHeaderDecoder.blockLength(),
-                    messageHeaderDecoder.version());
+        final int templateId = messageHeaderDecoder.templateId();
+        if (templateId == ClusterMembersResponseDecoder.TEMPLATE_ID)
+        {
+            clusterMembersResponseDecoder.wrap(
+                buffer,
+                offset + MessageHeaderDecoder.ENCODED_LENGTH,
+                messageHeaderDecoder.blockLength(),
+                messageHeaderDecoder.version());
 
-                handler.onClusterMembersResponse(
-                    clusterMembersResponseDecoder.correlationId(),
-                    clusterMembersResponseDecoder.leaderMemberId(),
-                    clusterMembersResponseDecoder.activeMembers(),
-                    clusterMembersResponseDecoder.passiveFollowers());
-                break;
+            handler.onClusterMembersResponse(
+                clusterMembersResponseDecoder.correlationId(),
+                clusterMembersResponseDecoder.leaderMemberId(),
+                clusterMembersResponseDecoder.activeMembers(),
+                clusterMembersResponseDecoder.passiveFollowers());
         }
     }
 }

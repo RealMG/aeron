@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef INCLUDED_AERON_COMMAND_CONTROLPROTOCOLEVENTS__
-#define INCLUDED_AERON_COMMAND_CONTROLPROTOCOLEVENTS__
+#ifndef AERON_COMMAND_CONTROL_PROTOCOL_EVENTS_H
+#define AERON_COMMAND_CONTROL_PROTOCOL_EVENTS_H
 
 #include <cstdint>
 #include <string>
@@ -76,6 +76,8 @@ struct ControlProtocolEvents
     static const std::int32_t ON_COUNTER_READY = 0x0F08;
     /** inform clients of removal of counter */
     static const std::int32_t ON_UNAVAILABLE_COUNTER = 0x0F09;
+    /** inform clients of client timeout */
+    static const std::int32_t ON_CLIENT_TIMEOUT = 0x0F0A;
 };
 
 }}

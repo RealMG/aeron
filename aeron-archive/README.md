@@ -13,7 +13,7 @@ feature for efficiency. If no subscribers are active then the recording can adva
 
 - **Extend:** service can extend an existing recording by appending.
 
-- **Replay:** service can replay a recorded `recordingId` from a particular `position`, and for a particular length.
+- **Replay:** service can replay a recorded `recordingId` from a particular `position`, and for a particular `length` which can be `Aeron.NULL_VALUE` for an open ended replay.
 
 - **Query:** service provides a rudimentary query interface which allows `recordingId` discovery and description. 
 Currently this supports a query for all descriptors, filtered by `<channel, streamId>`, or by specific `recordingId`.
@@ -68,6 +68,3 @@ The Archiver is backed by 2 file types, all of which are expected to reside in t
  as Aeron data streams. Data starts at `startPosition`, which translates into the offset
  `startPosition % termBufferLength` in the first segment file. From there one can read fragments
  as described by the DataFragmentHeader up to the `stopPosition`. Segment length is a multiple of `termBufferLength`.
- 
- 
- 

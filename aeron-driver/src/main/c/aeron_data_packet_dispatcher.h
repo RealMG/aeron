@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Real Logic Ltd.
+ * Copyright 2014-2019 Real Logic Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef AERON_AERON_DATA_PACKET_DISPATCHER_H
-#define AERON_AERON_DATA_PACKET_DISPATCHER_H
+#ifndef AERON_DATA_PACKET_DISPATCHER_H
+#define AERON_DATA_PACKET_DISPATCHER_H
 
-#include <netinet/in.h>
+#include "aeron_socket.h"
 #include "collections/aeron_int64_to_ptr_hash_map.h"
 #include "aeron_driver_conductor_proxy.h"
 
@@ -133,4 +133,4 @@ inline bool aeron_data_packet_dispatcher_should_elicit_setup_message(aeron_data_
     return (0 != dispatcher->session_by_stream_id_map.size);
 }
 
-#endif //AERON_AERON_DATA_PACKET_DISPATCHER_H
+#endif //AERON_DATA_PACKET_DISPATCHER_H
